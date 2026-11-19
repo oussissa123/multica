@@ -88,6 +88,8 @@ Les défaillances transitoires — un runtime brièvement hors ligne, un redéma
 
 Les erreurs renvoyées par l'agent lui-même ne sont généralement pas relancées automatiquement. Identifiants expirés, quota épuisé, mauvaise configuration ou modèle incapable de traiter la requête : il faut d'abord corriger la cause, puis relancer manuellement.
 
+Les limites du fournisseur font exception : une limite de débit, une erreur serveur du fournisseur ou une fenêtre d'usage de l'abonnement épuisée (comme la limite de session ou hebdomadaire de Claude Code) sont relancées automatiquement dès que le fournisseur accepte de nouveau les requêtes. Pour une fenêtre épuisée, l'exécution attend l'heure de réinitialisation indiquée par l'outil, et son runtime ne prend aucune nouvelle exécution d'ici là : le reste de sa file attend au lieu d'échouer sur la même limite.
+
 Le mode **Exécution seule** d'une automatisation ne relance pas automatiquement, pour éviter tout chevauchement avec la prochaine exécution planifiée. Le mode **Créer une tâche** produit des exécutions de tâche ordinaires, donc les défaillances d'infrastructure sont toujours relancées selon les règles ci-dessus. Les deux modes affichent leur résultat final dans l'historique des exécutions de l'automatisation.
 
 Lorsqu'une tâche n'a aucune autre exécution active et aucune nouvelle relance en attente, un échec fait repasser une tâche `in_progress` à `todo`.
@@ -121,8 +123,9 @@ Le préfixe `agent_error.` est omis dans ce tableau.
 | --- | --- | --- |
 | `provider_auth_or_access` | Échec d'authentification ou accès refusé par le fournisseur du modèle (401/403) | Reconnectez-vous dans cet outil de codage IA, ou vérifiez la clé API |
 | `provider_quota_limit` | Quota ou solde épuisé (402) | Rechargez le compte ou changez de compte |
-| `provider_capacity_or_rate_limit` | Limite de débit atteinte ou capacité insuffisante (429/529) | Réessayez plus tard |
-| `provider_server_error` | Erreur serveur du fournisseur du modèle (5xx) | Réessayez plus tard |
+| `provider_usage_window` | Fenêtre d'usage de l'abonnement épuisée (limite de session ou hebdomadaire) | Relance automatique après la réinitialisation de la fenêtre ; le runtime ne prend aucune nouvelle exécution d'ici là |
+| `provider_capacity_or_rate_limit` | Limite de débit atteinte ou capacité insuffisante (429/529) | Relance automatique après un délai d'attente |
+| `provider_server_error` | Erreur serveur du fournisseur du modèle (5xx) | Relance automatique après un court délai |
 | `provider_network` | Échec réseau lors de la connexion au fournisseur du modèle | Relance automatique ; vérifiez le réseau de la machine d'exécution si le problème persiste |
 | `model_not_found_or_unavailable` | Le modèle n'existe pas ou est actuellement indisponible | Choisissez un modèle disponible dans les paramètres de l'agent |
 | `context_overflow` | Le contexte a dépassé la fenêtre du modèle | Réduisez le périmètre de la tâche ou le volume d'entrée |
@@ -180,6 +183,9 @@ La relance automatique ne couvre que les défaillances transitoires ci-dessous, 
 | Codex bloqué sans sortie utile | 2 par défaut |
 | Échec du téléchargement du bundle de skills | 2 par défaut (le processus de l'agent n'a pas encore démarré à ce stade ; les bundles déjà téléchargés proviennent du cache local) |
 | Interruption réseau de l'outil | Jusqu'à 3 ; la dernière tentative démarre après un délai d'environ 5 secondes |
+| Limite de débit du fournisseur (429/529) | Jusqu'à 6 ; chaque relance attend 1, 5, 15, 30 puis 60 minutes, ou plus si le fournisseur le demande |
+| Erreur serveur du fournisseur (5xx) | Jusqu'à 3 ; les relances attendent environ 30 secondes, puis 2 minutes |
+| Fenêtre d'usage de l'abonnement épuisée | Jusqu'à 4 ; chaque relance démarre quelques minutes après la réinitialisation indiquée par l'outil (1 heure s'il n'en indique aucune) ; une réinitialisation à plus de 7 jours n'est pas relancée |
 
 Tous les autres motifs d'échec (authentification, quota, configuration, modèle, etc.) ne sont jamais relancés automatiquement ; corrigez d'abord la cause, puis relancez manuellement.
 

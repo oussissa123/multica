@@ -217,6 +217,13 @@ const (
 	// account is topped up.
 	ReasonAgentProviderQuotaLimit Reason = "agent_error.provider_quota_limit"
 
+	// ReasonAgentProviderUsageWindow: a subscription usage window (Claude
+	// Code's session / weekly limit, Codex's usage limit) is used up and
+	// the provider says when it resets. Unlike ReasonAgentProviderQuotaLimit
+	// the account recovers on its own, so the task is retried after the
+	// reset (RecoveryUsageWindow).
+	ReasonAgentProviderUsageWindow Reason = "agent_error.provider_usage_window"
+
 	// ReasonAgentProviderCapacityOrRateLimit: 429 / 529, rate-limited,
 	// overloaded, no capacity available. Transient — backoff +
 	// retry is appropriate.
@@ -277,7 +284,7 @@ const (
 	ReasonAgentUnknown Reason = "agent_error.unknown"
 )
 
-// allReasons is the canonical ordered list of the 27 reasons. Order is
+// allReasons is the canonical ordered list of the 28 reasons. Order is
 // stable so callers (e.g. Prometheus collectors that pre-warm series via
 // AllReasons) can build deterministic label sets across restarts.
 //
@@ -308,6 +315,7 @@ var allReasons = []Reason{
 	// Agent process side: provider errors.
 	ReasonAgentProviderAuthOrAccess,
 	ReasonAgentProviderQuotaLimit,
+	ReasonAgentProviderUsageWindow,
 	ReasonAgentProviderCapacityOrRateLimit,
 	ReasonAgentProviderServerError,
 	ReasonAgentProviderNetwork,

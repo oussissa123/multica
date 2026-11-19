@@ -88,6 +88,8 @@ Transient faults — a runtime going briefly offline, a daemon restart, an execu
 
 Errors returned by the agent itself are usually not retried automatically. Expired credentials, exhausted quota, misconfiguration, or a model unable to complete the request all need the cause fixed first, then a manual retry.
 
+A provider limit is the exception: a rate limit, a provider server error, or a used-up subscription window (such as Claude Code's session or weekly limit) is retried automatically once the provider accepts requests again. For a used-up window, the run waits until the reset time the tool reports, and its runtime takes no new runs until then, so the rest of its queue waits instead of failing on the same limit.
+
 An Autopilot's **run only** mode does not retry automatically, to avoid overlapping with the next scheduled run. The **create issue** mode produces regular issue runs, so infrastructure failures still retry under the rules above. Both modes show their final result in the Autopilot run history.
 
 When an issue has no other active run and no new retry waiting to run, a failure moves an `in_progress` issue back to `todo`.
@@ -121,8 +123,9 @@ The `agent_error.` prefix is omitted in this table.
 | --- | --- | --- |
 | `provider_auth_or_access` | Model provider authentication failed or access denied (401/403) | Sign in again in that AI coding tool, or check the API key |
 | `provider_quota_limit` | Quota or balance exhausted (402) | Top up or switch accounts |
-| `provider_capacity_or_rate_limit` | Rate limited or out of capacity (429/529) | Retry later |
-| `provider_server_error` | Model provider server error (5xx) | Retry later |
+| `provider_usage_window` | Subscription usage window used up (session or weekly limit) | Retries automatically after the window resets; the runtime takes no new runs until then |
+| `provider_capacity_or_rate_limit` | Rate limited or out of capacity (429/529) | Retries automatically after a backoff |
+| `provider_server_error` | Model provider server error (5xx) | Retries automatically after a short backoff |
 | `provider_network` | Network failure reaching the model provider | Retries automatically; check the executing machine's network if it persists |
 | `model_not_found_or_unavailable` | The model does not exist or is currently unavailable | Pick an available model in the agent settings |
 | `context_overflow` | Context exceeded the model window | Narrow the issue scope or reduce the input |
@@ -180,6 +183,9 @@ Automatic retry covers only the transient faults below, and only applies to runs
 | Codex stalled with no meaningful output | 2 by default |
 | Skill bundle download failure | 2 by default (the agent process has not started at this point; already-downloaded bundles come from the local cache) |
 | Tool network interruption | Up to 3; the final attempt starts after a delay of about 5 seconds |
+| Provider rate limit (429/529) | Up to 6; each retry waits 1, 5, 15, 30, then 60 minutes, or longer when the provider asks for it |
+| Provider server error (5xx) | Up to 3; retries wait about 30 seconds, then 2 minutes |
+| Subscription usage window used up | Up to 4; each retry starts a few minutes after the reset the tool reports (1 hour when it reports none); a reset more than 7 days away is not retried |
 
 All other failure reasons (auth, quota, configuration, model, and so on) never retry automatically; fix the cause first, then retry manually.
 

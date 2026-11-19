@@ -112,6 +112,9 @@ type AgentRuntime struct {
 	CustomName         pgtype.Text        `json:"custom_name"`
 	SharedWith         []pgtype.UUID      `json:"shared_with"`
 	MaxConcurrentTasks pgtype.Int4        `json:"max_concurrent_tasks"`
+	ThrottledUntil     pgtype.Timestamptz `json:"throttled_until"`
+	ThrottleReason     pgtype.Text        `json:"throttle_reason"`
+	ThrottledAt        pgtype.Timestamptz `json:"throttled_at"`
 }
 
 type AgentSkill struct {

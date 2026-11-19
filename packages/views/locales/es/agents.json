@@ -1019,6 +1019,7 @@
       "invalid_task_identity": "Discrepancia de identidad de la ejecución",
       "agent_error_provider_auth_or_access": "Falló la autenticación con el proveedor",
       "agent_error_provider_quota_limit": "Cuota del proveedor agotada",
+      "agent_error_provider_usage_window": "Límite de uso del proveedor alcanzado",
       "agent_error_provider_capacity_or_rate_limit": "Limitado por el proveedor (rate limit)",
       "agent_error_provider_server_error": "Error de servidor del proveedor",
       "agent_error_provider_network": "Error de red al contactar con el proveedor",

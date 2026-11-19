@@ -151,6 +151,7 @@ func (h *Handler) ReportTaskRateLimits(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to store rate limits")
 		return
 	}
+	h.TaskService.LiftRuntimeThrottleForSnapshot(r.Context(), task.RuntimeID, stored, req.RateLimits.ObservedAt)
 	w.WriteHeader(http.StatusNoContent)
 }
 

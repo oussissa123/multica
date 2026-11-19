@@ -125,6 +125,7 @@
     "invalid_task_identity": "執行身份不匹配",
     "agent_error_provider_auth_or_access": "提供商認證失敗",
     "agent_error_provider_quota_limit": "提供商配額已用盡",
+    "agent_error_provider_usage_window": "已達到提供商用量上限",
     "agent_error_provider_capacity_or_rate_limit": "受到提供商速率限制",
     "agent_error_provider_server_error": "提供商伺服器出錯",
     "agent_error_provider_network": "連線提供商時網路出錯",

@@ -87,6 +87,7 @@
       "provider_network": "La conexión con el proveedor del modelo se perdió antes de que terminara la respuesta. Comprueba tu red e inténtalo de nuevo.",
       "provider_auth_or_access": "La cuenta de modelo del agente ya no tiene la sesión iniciada. Inicia sesión de nuevo y reintenta.",
       "provider_quota_limit": "La cuenta de modelo del agente se ha quedado sin crédito. Recárgala o cambia de cuenta, y reintenta.",
+      "provider_usage_window": "Se agotó el límite de uso de la suscripción del agente y aún no se ha restablecido. Inténtalo de nuevo cuando se restablezca.",
       "provider_capacity_or_rate_limit": "El proveedor del modelo está ocupado o limitando la cuenta. Inténtalo de nuevo en un momento.",
       "context_overflow": "Esta conversación se hizo demasiado larga para el modelo. Empieza una sesión nueva, o divide tu petición en pasos más pequeños.",
       "runtime_missing_executable": "La CLI del agente no se ha podido ejecutar en esta máquina. Comprueba que está instalada correctamente y en el PATH, y reintenta.",

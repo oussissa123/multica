@@ -42,6 +42,7 @@ export const REASONS = new Set([
   // Agent process side — provider.
   "agent_error.provider_auth_or_access",
   "agent_error.provider_quota_limit",
+  "agent_error.provider_usage_window",
   "agent_error.provider_capacity_or_rate_limit",
   "agent_error.provider_server_error",
   "agent_error.provider_network",
