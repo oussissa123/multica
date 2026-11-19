@@ -871,6 +871,7 @@
       "invalid_task_identity": "실행 ID 정보가 일치하지 않음",
       "agent_error_provider_auth_or_access": "공급자 인증 실패",
       "agent_error_provider_quota_limit": "공급자 할당량 소진",
+      "agent_error_provider_usage_window": "공급자 사용 한도에 도달함",
       "agent_error_provider_capacity_or_rate_limit": "공급자 요청 한도에 도달함",
       "agent_error_provider_server_error": "공급자 서버 오류",
       "agent_error_provider_network": "공급자 연결 중 네트워크 오류",

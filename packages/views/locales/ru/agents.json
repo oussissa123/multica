@@ -1087,6 +1087,7 @@
       "invalid_task_identity": "Несоответствие идентификатора запуска",
       "agent_error_provider_auth_or_access": "Ошибка авторизации у провайдера",
       "agent_error_provider_quota_limit": "Квота провайдера исчерпана",
+      "agent_error_provider_usage_window": "Достигнут лимит использования провайдера",
       "agent_error_provider_capacity_or_rate_limit": "Ограничение частоты запросов провайдером",
       "agent_error_provider_server_error": "Ошибка сервера провайдера",
       "agent_error_provider_network": "Сетевая ошибка при обращении к провайдеру",

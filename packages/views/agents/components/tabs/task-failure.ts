@@ -27,6 +27,7 @@ export const FAILURE_REASON_I18N_KEYS = {
   "agent_error.provider_auth_or_access":
     "agent_error_provider_auth_or_access",
   "agent_error.provider_quota_limit": "agent_error_provider_quota_limit",
+  "agent_error.provider_usage_window": "agent_error_provider_usage_window",
   "agent_error.provider_capacity_or_rate_limit":
     "agent_error_provider_capacity_or_rate_limit",
   "agent_error.provider_server_error": "agent_error_provider_server_error",
