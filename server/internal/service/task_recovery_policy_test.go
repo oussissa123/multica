@@ -20,8 +20,8 @@ func TestRecoveryPolicyFromSettings(t *testing.T) {
 	}{
 		{"no settings", ``, def},
 		{"no recovery key", `{"github_enabled":false}`, def},
-		{"overrides", `{"task_recovery":{"enabled":true,"pause_runtime":false,"usage_window_retries":1,"rate_limit_retries":0,"server_error_retries":10,"max_wait_hours":24}}`,
-			RecoveryPolicy{Enabled: true, PauseRuntime: false, UsageWindowRetries: 1, RateLimitRetries: 0, ServerErrorRetries: 10, MaxWaitHours: 24}},
+		{"overrides", `{"task_recovery":{"enabled":true,"pause_runtime":false,"usage_window_retries":1,"rate_limit_retries":0,"server_error_retries":10,"awaiting_fix_retries":2,"max_wait_hours":24}}`,
+			RecoveryPolicy{Enabled: true, PauseRuntime: false, UsageWindowRetries: 1, RateLimitRetries: 0, ServerErrorRetries: 10, AwaitingFixRetries: 2, MaxWaitHours: 24}},
 		{"turned off", `{"task_recovery":{"enabled":false}}`, func() RecoveryPolicy { p := def; p.Enabled = false; return p }()},
 		{"out of range and mistyped values keep defaults", `{"task_recovery":{"enabled":"no","usage_window_retries":99,"rate_limit_retries":-1,"max_wait_hours":0}}`, def},
 		{"malformed object", `{"task_recovery":[1,2]}`, def},
@@ -146,5 +146,99 @@ func TestWorkspacePolicyStopsUsageWindowRetries(t *testing.T) {
 	}
 	if !throttled {
 		t.Fatal("runtime not throttled although its account is out")
+	}
+}
+
+func TestPlanRetryAwaitingFix(t *testing.T) {
+	now := time.Date(2026, time.November, 18, 11, 58, 0, 0, time.UTC)
+	svc := &TaskService{}
+	auth := "agent_error.provider_auth_or_access"
+
+	plan, retry := svc.planRetry(context.Background(), db.AgentTaskQueue{Attempt: 1}, auth, "Not logged in", now, DefaultRecoveryPolicy())
+	if !retry || plan.hintSource != "awaiting_fix" {
+		t.Fatalf("first recheck: retry=%v source=%q", retry, plan.hintSource)
+	}
+	if wait := plan.fireAt.Sub(now); wait < 24*time.Minute || wait > 36*time.Minute {
+		t.Fatalf("first recheck waits %s, want about 30m", wait)
+	}
+	if !plan.throttleUntil.IsZero() {
+		t.Fatal("a sign-in failure must not pause the runtime: other agents on it may work")
+	}
+
+	plan, _ = svc.planRetry(context.Background(), db.AgentTaskQueue{Attempt: 4}, auth, "Not logged in", now, DefaultRecoveryPolicy())
+	if wait := plan.fireAt.Sub(now); wait < 19*time.Hour || wait > 29*time.Hour {
+		t.Fatalf("fourth recheck waits %s, want about 24h", wait)
+	}
+	if _, retry := svc.planRetry(context.Background(), db.AgentTaskQueue{Attempt: 5}, auth, "Not logged in", now, DefaultRecoveryPolicy()); retry {
+		t.Fatal("rechecked past the default budget of four")
+	}
+
+	shortWait := DefaultRecoveryPolicy()
+	shortWait.MaxWaitHours = 6
+	if _, retry := svc.planRetry(context.Background(), db.AgentTaskQueue{Attempt: 3}, auth, "Not logged in", now, shortWait); retry {
+		t.Fatal("an 8h recheck was planned under a 6h maximum wait")
+	}
+
+	none := DefaultRecoveryPolicy()
+	none.AwaitingFixRetries = 0
+	if _, retry := svc.planRetry(context.Background(), db.AgentTaskQueue{Attempt: 1}, auth, "Not logged in", now, none); retry {
+		t.Fatal("rechecked with awaiting_fix_retries=0")
+	}
+}
+
+// TestSuccessPullsForwardRetriesAwaitingFix: once a run succeeds on a runtime,
+// a recheck waiting there for a sign-in fix runs now.
+func TestSuccessPullsForwardRetriesAwaitingFix(t *testing.T) {
+	sharedPool := newResolveOriginatorPool(t)
+	pool := testutil.IsolatedDB(t, sharedPool.Config().ConnString())
+	ctx := context.Background()
+	q := db.New(pool)
+	_, _, agentID, issueID := seedAttributionFixture(t, pool)
+	var runtimeID string
+	if err := pool.QueryRow(ctx, `SELECT runtime_id::text FROM agent WHERE id = $1`, agentID).Scan(&runtimeID); err != nil {
+		t.Fatalf("read agent runtime: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE agent_runtime SET status='online', last_seen_at=now() WHERE id=$1`, runtimeID); err != nil {
+		t.Fatalf("mark runtime online: %v", err)
+	}
+
+	svc := NewTaskService(q, pool, nil, events.New())
+	var authParent pgtype.UUID
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO agent_task_queue (agent_id, runtime_id, issue_id, status, priority, attempt, max_attempts)
+		VALUES ($1, $2, $3, 'running', 0, 1, 2) RETURNING id
+	`, agentID, runtimeID, issueID).Scan(&authParent); err != nil {
+		t.Fatalf("insert task: %v", err)
+	}
+	if _, err := svc.FailTask(ctx, authParent, "Not logged in · Please run /login", "", "", "", "", false, "", ""); err != nil {
+		t.Fatalf("FailTask: %v", err)
+	}
+	var recheck pgtype.UUID
+	var fireAt time.Time
+	if err := pool.QueryRow(ctx, `SELECT id, fire_at FROM agent_task_queue WHERE parent_task_id = $1 AND status = 'deferred'`, authParent).Scan(&recheck, &fireAt); err != nil {
+		t.Fatalf("read recheck: %v", err)
+	}
+	if time.Until(fireAt) < 20*time.Minute {
+		t.Fatalf("recheck due in %s, want a long backoff", time.Until(fireAt))
+	}
+
+	// Another run on the same runtime succeeds: the sign-in is fixed.
+	var okTask pgtype.UUID
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO agent_task_queue (agent_id, runtime_id, issue_id, status, priority, started_at)
+		VALUES ($1, $2, $3, 'running', 0, now()) RETURNING id
+	`, agentID, runtimeID, issueID).Scan(&okTask); err != nil {
+		t.Fatalf("insert succeeding task: %v", err)
+	}
+	if _, err := svc.CompleteTask(ctx, okTask, []byte(`{"output":"done"}`), "", "", "", false, "", ""); err != nil {
+		t.Fatalf("CompleteTask: %v", err)
+	}
+
+	var status string
+	if err := pool.QueryRow(ctx, `SELECT status, fire_at FROM agent_task_queue WHERE id = $1`, recheck).Scan(&status, &fireAt); err != nil {
+		t.Fatalf("read recheck after success: %v", err)
+	}
+	if status != "queued" && time.Until(fireAt) > time.Second {
+		t.Fatalf("recheck = %s due in %s, want pulled forward", status, time.Until(fireAt))
 	}
 }

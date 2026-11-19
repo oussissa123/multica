@@ -12,8 +12,9 @@ import (
 )
 
 // WorkspaceSettingTaskRecovery is the workspace.settings key holding how a
-// workspace retries runs stopped by a provider limit. Every field is optional;
-// an absent or invalid field keeps its default.
+// workspace retries runs stopped by a provider limit or by something a person
+// has to fix. Every field is optional; an absent or invalid field keeps its
+// default.
 const WorkspaceSettingTaskRecovery = "task_recovery"
 
 const (
@@ -33,6 +34,9 @@ type RecoveryPolicy struct {
 	UsageWindowRetries int32 `json:"usage_window_retries"`
 	RateLimitRetries   int32 `json:"rate_limit_retries"`
 	ServerErrorRetries int32 `json:"server_error_retries"`
+	// AwaitingFixRetries rechecks runs that failed on something a person
+	// fixes (sign-in, configuration, CLI install, credit).
+	AwaitingFixRetries int32 `json:"awaiting_fix_retries"`
 	// MaxWaitHours: a retry the provider would make wait longer is not made.
 	MaxWaitHours int32 `json:"max_wait_hours"`
 }
@@ -45,6 +49,7 @@ func DefaultRecoveryPolicy() RecoveryPolicy {
 		UsageWindowRetries: usageWindowMaxAttempts - 1,
 		RateLimitRetries:   rateLimitMaxAttempts - 1,
 		ServerErrorRetries: serverErrorMaxAttempts - 1,
+		AwaitingFixRetries: int32(len(awaitingFixBackoff)),
 		MaxWaitHours:       MaxRecoveryWaitHours,
 	}
 }
@@ -83,6 +88,7 @@ func RecoveryPolicyFromSettings(settings []byte) RecoveryPolicy {
 	readInt("usage_window_retries", 0, MaxRecoveryRetries, &p.UsageWindowRetries)
 	readInt("rate_limit_retries", 0, MaxRecoveryRetries, &p.RateLimitRetries)
 	readInt("server_error_retries", 0, MaxRecoveryRetries, &p.ServerErrorRetries)
+	readInt("awaiting_fix_retries", 0, MaxRecoveryRetries, &p.AwaitingFixRetries)
 	readInt("max_wait_hours", 1, MaxRecoveryWaitHours, &p.MaxWaitHours)
 	return p
 }
@@ -101,7 +107,7 @@ func ValidateRecoverySetting(value any) error {
 			if _, ok := v.(bool); !ok {
 				return fmt.Errorf("task_recovery.%s must be true or false", key)
 			}
-		case "usage_window_retries", "rate_limit_retries", "server_error_retries":
+		case "usage_window_retries", "rate_limit_retries", "server_error_retries", "awaiting_fix_retries":
 			if !intInRange(v, 0, MaxRecoveryRetries) {
 				return fmt.Errorf("task_recovery.%s must be a whole number from 0 to %d", key, MaxRecoveryRetries)
 			}
@@ -130,6 +136,9 @@ func (p RecoveryPolicy) retries(reason string) int32 {
 		return p.RateLimitRetries
 	case string(taskfailure.ReasonAgentProviderServerError):
 		return p.ServerErrorRetries
+	}
+	if awaitingFixReasons[reason] {
+		return p.AwaitingFixRetries
 	}
 	return 0
 }

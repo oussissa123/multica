@@ -267,8 +267,11 @@ func TestTaskFailureClassifiers(t *testing.T) {
 		// the provider's retry-after (task_recovery.go).
 		{reason: "agent_error.provider_capacity_or_rate_limit", wantType: "agent_error", wantResumeOK: true, wantRetry: true},
 		{reason: "agent_error.provider_usage_window", wantType: "agent_error", wantResumeOK: true, wantRetry: true},
-		// A prepaid balance does not come back on its own.
-		{reason: "agent_error.provider_quota_limit", wantType: "agent_error", wantResumeOK: true, wantRetry: false},
+		// A prepaid balance does not come back on its own, so the run is
+		// rechecked on a long backoff until a person tops it up.
+		{reason: "agent_error.provider_quota_limit", wantType: "agent_error", wantResumeOK: true, wantRetry: true},
+		{reason: "agent_error.provider_auth_or_access", wantType: "agent_error", wantResumeOK: true, wantRetry: true},
+		{reason: "agent_error.model_not_found_or_unavailable", wantType: "agent_error", wantResumeOK: true, wantRetry: false},
 		{reason: "runtime_recovery", wantType: "runtime", wantResumeOK: true, wantRetry: true},
 		{reason: "iteration_limit", wantType: "agent_output", wantResumeOK: false, wantRetry: false},
 		{reason: "api_invalid_request", wantType: "agent_error", wantResumeOK: false, wantRetry: false},

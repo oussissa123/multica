@@ -29,6 +29,47 @@ func (q *Queries) LiftRuntimeThrottle(ctx context.Context, id pgtype.UUID) (int6
 	return result.RowsAffected(), nil
 }
 
+const pullForwardRetriesAwaitingFix = `-- name: PullForwardRetriesAwaitingFix :many
+UPDATE agent_task_queue t
+SET fire_at = now()
+FROM agent_task_queue p
+WHERE t.runtime_id = $1
+  AND t.status = 'deferred'
+  AND t.fire_at > now()
+  AND p.id = t.parent_task_id
+  AND p.failure_reason = ANY($2::text[])
+RETURNING t.id
+`
+
+type PullForwardRetriesAwaitingFixParams struct {
+	RuntimeID pgtype.UUID `json:"runtime_id"`
+	Reasons   []string    `json:"reasons"`
+}
+
+// A run that just succeeded on a runtime proves whatever a person had to fix
+// there (sign-in, configuration, the CLI install, credit) is fixed: retries
+// waiting out a long recheck for one of those reasons run now instead.
+// Served by the partial deferred index on (runtime_id, fire_at).
+func (q *Queries) PullForwardRetriesAwaitingFix(ctx context.Context, arg PullForwardRetriesAwaitingFixParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, pullForwardRetriesAwaitingFix, arg.RuntimeID, arg.Reasons)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const rescheduleDeferredTask = `-- name: RescheduleDeferredTask :one
 UPDATE agent_task_queue
 SET fire_at = $1::timestamptz

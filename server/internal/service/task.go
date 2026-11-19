@@ -4961,6 +4961,7 @@ func (s *TaskService) CompleteTaskWithTransition(ctx context.Context, taskID pgt
 	s.publishRequeuedChatTasks(ctx, queuedChat)
 	slog.Info("task completed", "task_id", util.UUIDToString(task.ID), "issue_id", util.UUIDToString(task.IssueID))
 	s.captureTaskCompleted(ctx, task)
+	s.pullForwardRetriesAwaitingFix(ctx, task.RuntimeID)
 
 	// Invariant: every completed issue task must have at least one agent
 	// comment on the issue, so the user always sees something when a run
@@ -5744,10 +5745,11 @@ var retryableReasons = map[string]bool{
 }
 
 // isRetryableReason reports whether the auto-retry path acts on a failure
-// reason: the infrastructure allowlist above, plus provider limits, which are
-// retried once the provider accepts requests again (task_recovery.go).
+// reason: the infrastructure allowlist above, plus the reasons the workspace
+// recovery policy governs (provider limits, and failures a person fixes),
+// which are retried after a backoff (task_recovery.go).
 func isRetryableReason(reason string) bool {
-	return retryableReasons[reason] || (isProviderLimitReason(reason) && providerLimitRecoveryEnabled())
+	return retryableReasons[reason] || (isPolicyReason(reason) && providerLimitRecoveryEnabled())
 }
 
 // runtime_offline retries start deferred, not queued: their positive fire_at
@@ -5786,8 +5788,8 @@ func retryAttemptCeiling(reason string, taskMaxAttempts int32) int32 {
 	if reason == string(taskfailure.ReasonAgentProviderNetwork) && taskMaxAttempts < providerNetworkMaxAttempts {
 		return providerNetworkMaxAttempts
 	}
-	if ceiling, ok := providerLimitAttemptCeilings[reason]; ok && taskMaxAttempts < ceiling {
-		return ceiling
+	if isPolicyReason(reason) && taskMaxAttempts < policyAttemptCeiling {
+		return policyAttemptCeiling
 	}
 	return taskMaxAttempts
 }
