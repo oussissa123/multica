@@ -15,3 +15,25 @@ WHERE runtime_rate_limit.observed_at <= EXCLUDED.observed_at;
 SELECT runtime_id, workspace_id, snapshot, observed_at, updated_at
 FROM runtime_rate_limit
 WHERE runtime_id = $1;
+
+-- name: ThrottleRuntime :exec
+-- Holds back claims on a runtime until its usage window resets. Concurrent
+-- failures keep the latest reset (GREATEST ignores the NULL of an unthrottled
+-- runtime).
+UPDATE agent_runtime
+SET throttled_until = GREATEST(throttled_until, @throttled_until::timestamptz),
+    throttle_reason = @throttle_reason::text,
+    throttled_at = now()
+WHERE id = @id;
+
+-- name: LiftRuntimeThrottleObservedAfter :execrows
+-- Lifts a throttle early when the CLI reports a snapshot with room left. The
+-- snapshot must be observed after the throttle was set: an older report
+-- predates the exhaustion and says nothing about the account now.
+UPDATE agent_runtime
+SET throttled_until = NULL,
+    throttle_reason = NULL,
+    throttled_at = NULL
+WHERE id = @id
+  AND throttled_until > now()
+  AND throttled_at < @observed_at::timestamptz;
