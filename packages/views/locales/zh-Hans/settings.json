@@ -142,6 +142,8 @@
     "usage_window_label": "用量窗口用完",
     "rate_limit_label": "限流",
     "server_error_label": "服务商服务端错误",
+    "awaiting_fix_label": "需修复登录、配置或余额",
+    "awaiting_fix_description": "在 30 分钟、2 小时、8 小时后重新检查，此后每天一次；同一运行时上有其他运行成功时会立即重新检查。",
     "max_wait_label": "最长等待",
     "max_wait_description": "需要等待更久的重试不会进行，运行保持失败。",
     "retries_none": "不重试",

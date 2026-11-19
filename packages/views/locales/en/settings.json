@@ -143,6 +143,8 @@
     "usage_window_label": "Used-up usage window",
     "rate_limit_label": "Rate limit",
     "server_error_label": "Provider server error",
+    "awaiting_fix_label": "Sign-in, configuration or credit to fix",
+    "awaiting_fix_description": "Rechecked after 30 minutes, 2 hours, 8 hours, then daily, and right away once another run on the same runtime succeeds.",
     "max_wait_label": "Longest wait",
     "max_wait_description": "A retry that would have to wait longer is not made; the run stays failed.",
     "retries_none": "Don't retry",

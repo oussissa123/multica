@@ -45,6 +45,7 @@ describe("TaskRecoverySection", () => {
     expect(screen.getByRole("switch", { name: copy.pause_runtime_label })).toBeChecked();
     expect(screen.getByRole("combobox", { name: copy.usage_window_label })).toHaveTextContent("3 retries");
     expect(screen.getByRole("combobox", { name: copy.rate_limit_label })).toHaveTextContent("5 retries");
+    expect(screen.getByRole("combobox", { name: copy.awaiting_fix_label })).toHaveTextContent("4 retries");
     expect(screen.getByRole("combobox", { name: copy.max_wait_label })).toHaveTextContent("7 days");
   });
 

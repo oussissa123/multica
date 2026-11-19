@@ -143,6 +143,8 @@
     "usage_window_label": "Ventana de uso agotada",
     "rate_limit_label": "Límite de frecuencia",
     "server_error_label": "Error de servidor del proveedor",
+    "awaiting_fix_label": "Inicio de sesión, configuración o crédito por corregir",
+    "awaiting_fix_description": "Se vuelve a comprobar a los 30 minutos, 2 horas, 8 horas y luego cada día, y de inmediato en cuanto otra ejecución tiene éxito en el mismo runtime.",
     "max_wait_label": "Espera máxima",
     "max_wait_description": "No se hace un reintento que tendría que esperar más; la ejecución queda fallida.",
     "retries_none": "No reintentar",

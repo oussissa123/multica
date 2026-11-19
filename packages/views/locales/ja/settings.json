@@ -142,6 +142,8 @@
     "usage_window_label": "利用枠の枯渇",
     "rate_limit_label": "レート制限",
     "server_error_label": "プロバイダーのサーバーエラー",
+    "awaiting_fix_label": "ログイン・設定・残高の修正待ち",
+    "awaiting_fix_description": "30 分後、2 時間後、8 時間後、その後は毎日再確認し、同じランタイムで別の実行が成功したらすぐに再確認します。",
     "max_wait_label": "最大待機時間",
     "max_wait_description": "これより長く待つ必要があるリトライは行わず、実行は失敗のままになります。",
     "retries_none": "リトライしない",
