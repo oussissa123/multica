@@ -40,7 +40,7 @@ const allowedDevOrigins = process.env.CORS_ALLOWED_ORIGINS
 
 const nextConfig: NextConfig = {
   ...(process.env.STANDALONE === "true" ? { output: "standalone" as const } : {}),
-  transpilePackages: ["@multica/core", "@multica/ui", "@multica/views", "@multica/ee"],
+  transpilePackages: ["@multica/core", "@multica/ui", "@multica/views"],
   experimental: {
     // Workspace pages are client components over TanStack Query, so a route's
     // RSC payload is the same on every visit. Reusing a visited or prefetched
