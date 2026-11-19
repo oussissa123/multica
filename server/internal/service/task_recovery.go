@@ -3,15 +3,19 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/multica-ai/multica/server/internal/util"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
+	"github.com/multica-ai/multica/server/pkg/protocol"
 	"github.com/multica-ai/multica/server/pkg/taskfailure"
 )
 
@@ -231,4 +235,48 @@ func backoffFor(schedule []time.Duration, failedAttempt int32) time.Duration {
 // lockstep.
 func jitter(d time.Duration, fraction float64) time.Duration {
 	return time.Duration(float64(d) * (1 + fraction*(2*rand.Float64()-1)))
+}
+
+// ErrTaskNotDeferred: the task already left 'deferred' (promoted, claimed or
+// cancelled), so there is no fire time left to move.
+var ErrTaskNotDeferred = errors.New("task is not waiting for a scheduled retry")
+
+// RescheduleDeferredTask moves a deferred task's fire time on a person's
+// request. A time that is already due is promoted straight away, so "resume
+// now" does not wait for the daemon's next deferred-work check.
+func (s *TaskService) RescheduleDeferredTask(ctx context.Context, taskID pgtype.UUID, fireAt time.Time) (db.AgentTaskQueue, error) {
+	task, err := s.Queries.RescheduleDeferredTask(ctx, db.RescheduleDeferredTaskParams{
+		ID:     taskID,
+		FireAt: pgtype.Timestamptz{Time: fireAt, Valid: true},
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return db.AgentTaskQueue{}, ErrTaskNotDeferred
+	}
+	if err != nil {
+		return db.AgentTaskQueue{}, fmt.Errorf("reschedule deferred task: %w", err)
+	}
+	s.broadcastTaskEvent(ctx, protocol.EventTaskRescheduled, task)
+	if !fireAt.After(time.Now()) {
+		if err := s.PromoteDueDeferredTasksForRuntime(ctx, task.RuntimeID); err != nil {
+			slog.Warn("promote rescheduled task failed", "task_id", util.UUIDToString(task.ID), "error", err)
+		}
+	}
+	return task, nil
+}
+
+// LiftRuntimeThrottle ends a usage-window throttle on a person's request and
+// releases the deferred work that was only waiting for it. It reports false
+// when the runtime was not throttled.
+func (s *TaskService) LiftRuntimeThrottle(ctx context.Context, runtimeID pgtype.UUID) (bool, error) {
+	lifted, err := s.Queries.LiftRuntimeThrottle(ctx, runtimeID)
+	if err != nil {
+		return false, fmt.Errorf("lift runtime throttle: %w", err)
+	}
+	if lifted == 0 {
+		return false, nil
+	}
+	if err := s.PromoteDueDeferredTasksForRuntime(ctx, runtimeID); err != nil {
+		slog.Warn("promote after lifting runtime throttle failed", "runtime_id", util.UUIDToString(runtimeID), "error", err)
+	}
+	return true, nil
 }
