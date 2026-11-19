@@ -25,6 +25,8 @@ import (
 // ending the task, and a used-up usage window also throttles the runtime so
 // the rest of its queue waits rather than failing on the same limit.
 
+// Default attempt budgets (first run included); a workspace can change them
+// through its recovery policy (task_recovery_policy.go).
 const (
 	// usageWindowMaxAttempts: first run plus three reports, enough to ride
 	// out a session window, a weekly window behind it, and one misread reset.
@@ -41,9 +43,6 @@ const (
 	// usageWindowDefaultWait applies when neither the error nor the latest
 	// rate-limit snapshot names a reset.
 	usageWindowDefaultWait = time.Hour
-	// recoveryMaxHorizon caps how far ahead a retry may be scheduled. A
-	// weekly window reset is within it; anything later goes to a person.
-	recoveryMaxHorizon = 7 * 24 * time.Hour
 )
 
 // rateLimitBackoff and serverErrorBackoff are indexed by the failed attempt
@@ -53,10 +52,12 @@ var (
 	serverErrorBackoff = []time.Duration{30 * time.Second, 2 * time.Minute}
 )
 
+// providerLimitAttemptCeilings are the hard caps retryEligible applies; the
+// workspace policy's own budget, at or below them, is enforced by planRetry.
 var providerLimitAttemptCeilings = map[string]int32{
-	string(taskfailure.ReasonAgentProviderUsageWindow):         usageWindowMaxAttempts,
-	string(taskfailure.ReasonAgentProviderCapacityOrRateLimit): rateLimitMaxAttempts,
-	string(taskfailure.ReasonAgentProviderServerError):         serverErrorMaxAttempts,
+	string(taskfailure.ReasonAgentProviderUsageWindow):         MaxRecoveryRetries + 1,
+	string(taskfailure.ReasonAgentProviderCapacityOrRateLimit): MaxRecoveryRetries + 1,
+	string(taskfailure.ReasonAgentProviderServerError):         MaxRecoveryRetries + 1,
 }
 
 // providerLimitRecoveryEnabled is the operator kill switch
@@ -81,40 +82,72 @@ type retryPlan struct {
 	throttleUntil time.Time
 	// hintSource says where fireAt came from, for the log.
 	hintSource string
+	// maxAttempts is the policy's attempt budget for a provider-limit
+	// reason, persisted on the retry so the chain reads "attempt 2 of 4";
+	// zero for other reasons.
+	maxAttempts int32
 }
 
-// planRetry schedules the retry of a failed attempt. ok is false when the
-// provider's reset lies beyond recoveryMaxHorizon: such a task is not retried.
-func (s *TaskService) planRetry(ctx context.Context, parent db.AgentTaskQueue, reason, errMsg string, now time.Time) (retryPlan, bool) {
+// attemptCeiling is the max_attempts a retry child records.
+func (p retryPlan) attemptCeiling(reason string, taskMaxAttempts int32) int32 {
+	if p.maxAttempts > 0 {
+		return p.maxAttempts
+	}
+	return retryAttemptCeiling(reason, taskMaxAttempts)
+}
+
+// retryPlanFor plans the retry of a failed attempt, under the workspace
+// recovery policy for provider-limit reasons.
+func (s *TaskService) retryPlanFor(ctx context.Context, parent db.AgentTaskQueue, reason, errMsg string, now time.Time) (retryPlan, bool) {
+	policy := DefaultRecoveryPolicy()
+	if isProviderLimitReason(reason) {
+		policy = s.recoveryPolicyFor(ctx, parent)
+	}
+	return s.planRetry(ctx, parent, reason, errMsg, now, policy)
+}
+
+// planRetry schedules the retry of a failed attempt. retry is false when the
+// policy turns provider-limit retries off, the reason's budget is spent, or
+// the provider's reset lies beyond the policy's longest wait. A used-up usage
+// window still sets throttleUntil then: the account is out either way, and
+// the rest of the runtime's queue should wait rather than fail.
+func (s *TaskService) planRetry(ctx context.Context, parent db.AgentTaskQueue, reason, errMsg string, now time.Time, policy RecoveryPolicy) (plan retryPlan, retry bool) {
+	if !isProviderLimitReason(reason) {
+		if delay := retryDelayForAttempt(reason, parent.Attempt); delay > 0 {
+			return retryPlan{fireAt: now.Add(delay)}, true
+		}
+		return retryPlan{}, true
+	}
+	if !policy.Enabled {
+		return retryPlan{}, false
+	}
+	budget := policy.retries(reason)
+	plan.maxAttempts = budget + 1
+	retry = parent.Attempt <= budget
+
 	switch reason {
 	case string(taskfailure.ReasonAgentProviderUsageWindow):
 		reset, source := usageWindowReset(errMsg, s.runtimeRateLimitSnapshot(ctx, parent.RuntimeID), now)
-		if reset.Sub(now) > recoveryMaxHorizon {
-			return retryPlan{}, false
-		}
 		throttle := reset.Add(usageWindowResetMargin)
-		return retryPlan{
-			fireAt:        throttle.Add(rand.N(usageWindowResumeJitter)),
-			throttleUntil: throttle,
-			hintSource:    source,
-		}, true
+		if policy.PauseRuntime && reset.Sub(now) <= time.Duration(MaxRecoveryWaitHours)*time.Hour {
+			plan.throttleUntil = throttle
+		}
+		plan.fireAt = throttle.Add(rand.N(usageWindowResumeJitter))
+		plan.hintSource = source
+		return plan, retry && reset.Sub(now) <= policy.maxWait()
 	case string(taskfailure.ReasonAgentProviderCapacityOrRateLimit):
 		wait := backoffFor(rateLimitBackoff, parent.Attempt)
-		source := "backoff"
+		plan.hintSource = "backoff"
 		if hint, ok := taskfailure.ParseRetryHint(errMsg, now, nil); ok && hint.At.Sub(now) > wait {
-			wait, source = hint.At.Sub(now), hint.Source
+			wait, plan.hintSource = hint.At.Sub(now), hint.Source
 		}
-		if wait > recoveryMaxHorizon {
-			return retryPlan{}, false
-		}
-		return retryPlan{fireAt: now.Add(jitter(wait, 0.2)), hintSource: source}, true
-	case string(taskfailure.ReasonAgentProviderServerError):
-		return retryPlan{fireAt: now.Add(jitter(backoffFor(serverErrorBackoff, parent.Attempt), 0.2)), hintSource: "backoff"}, true
+		plan.fireAt = now.Add(jitter(wait, 0.2))
+		return plan, retry && wait <= policy.maxWait()
+	default: // provider server error
+		plan.fireAt = now.Add(jitter(backoffFor(serverErrorBackoff, parent.Attempt), 0.2))
+		plan.hintSource = "backoff"
+		return plan, retry
 	}
-	if delay := retryDelayForAttempt(reason, parent.Attempt); delay > 0 {
-		return retryPlan{fireAt: now.Add(delay)}, true
-	}
-	return retryPlan{}, true
 }
 
 // applyRetryThrottle throttles the parent's runtime for a usage-window retry.

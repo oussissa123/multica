@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/multica-ai/multica/server/internal/testutil"
 )
 
 func resumeTaskRequest(t *testing.T, userID, taskID string, body map[string]any) *httptest.ResponseRecorder {
@@ -144,5 +146,39 @@ func TestLiftRuntimeThrottle(t *testing.T) {
 	}
 	if resp.ThrottledUntil != nil || resp.ThrottleReason != nil {
 		t.Fatalf("response still throttled: until=%v reason=%v", resp.ThrottledUntil, resp.ThrottleReason)
+	}
+}
+
+func TestUpdateWorkspaceValidatesTaskRecovery(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	wsID := dbfx.Insert(t, "workspace", testutil.Cols{
+		"name": "Recovery Policy", "slug": "recovery-policy", "description": "", "issue_prefix": "RCP",
+	})
+	dbfx.Exec(t, `INSERT INTO member (workspace_id, user_id, role) VALUES ($1, $2, 'owner')`, wsID, testUserID)
+	save := func(recovery any) *httptest.ResponseRecorder {
+		t.Helper()
+		req := withURLParam(newRequest("PATCH", "/api/workspaces/"+wsID, map[string]any{
+			"settings": map[string]any{"task_recovery": recovery},
+		}), "id", wsID)
+		w := httptest.NewRecorder()
+		testHandler.UpdateWorkspace(w, req)
+		return w
+	}
+
+	if w := save(map[string]any{"rate_limit_retries": 99}); w.Code != http.StatusBadRequest {
+		t.Fatalf("out-of-range budget: expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if w := save(map[string]any{"retries": 3}); w.Code != http.StatusBadRequest {
+		t.Fatalf("unknown field: expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if w := save(map[string]any{"enabled": false, "usage_window_retries": 1, "max_wait_hours": 24}); w.Code != http.StatusOK {
+		t.Fatalf("valid policy: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var stored string
+	dbfx.QueryRow(t, `SELECT settings->'task_recovery'->>'usage_window_retries' FROM workspace WHERE id = $1`, wsID).Scan(&stored)
+	if stored != "1" {
+		t.Fatalf("stored usage_window_retries = %q, want 1", stored)
 	}
 }
