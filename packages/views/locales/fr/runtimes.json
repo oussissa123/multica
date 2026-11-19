@@ -699,6 +699,12 @@
       "connected": "{{name}} connecté à Multica"
     }
   },
+  "throttle": {
+    "title": "En pause jusqu'à {{time}}",
+    "description": "La limite d'utilisation du compte est atteinte. Les exécutions en file attendent la réinitialisation au lieu d'échouer.",
+    "lift": "Reprendre maintenant",
+    "lift_failed": "Impossible de reprendre le runtime"
+  },
   "rate_limits": {
     "title": "Limites",
     "caption": "Signalées par la CLI pendant l'exécution des tâches",

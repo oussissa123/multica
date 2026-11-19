@@ -91,6 +91,7 @@ export function useStatusLabel(status: AgentTask["status"]): string {
   const { t } = useT("issues");
   switch (status) {
     case "queued": return t(($) => $.execution_log.status_queued);
+    case "deferred": return t(($) => $.execution_log.status_deferred);
     case "dispatched": return t(($) => $.execution_log.status_dispatched);
     case "waiting_local_directory":
       return t(($) => $.execution_log.status_waiting_local_directory);
@@ -124,4 +125,12 @@ export function useFormatSpend(): (usage: Pick<TaskUsageSummary, "cost" | "credi
     credits,
     provider: providerDisplayName(provider),
   }));
+}
+
+/**
+ * An automatic retry waiting for its backoff or a provider limit reset, as
+ * opposed to a deferred wakeup run, which the wakeup surfaces own.
+ */
+export function isScheduledRetry(task: AgentTask): boolean {
+  return task.status === "deferred" && !!task.parent_task_id && !task.wakeup_id;
 }

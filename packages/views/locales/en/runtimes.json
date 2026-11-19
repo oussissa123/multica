@@ -699,6 +699,12 @@
       "connected": "{{name}} connected to Multica"
     }
   },
+  "throttle": {
+    "title": "Paused until {{time}}",
+    "description": "The account's usage limit is used up. Queued runs wait for the reset instead of failing.",
+    "lift": "Resume now",
+    "lift_failed": "Failed to resume the runtime"
+  },
   "rate_limits": {
     "title": "Limits",
     "caption": "Reported by the CLI while tasks run",
