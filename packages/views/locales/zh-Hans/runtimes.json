@@ -679,6 +679,12 @@
       "connected": "{{name}} 已连接到 Multica"
     }
   },
+  "throttle": {
+    "title": "暂停至 {{time}}",
+    "description": "账号用量上限已用完。排队中的运行会等待重置，而不会失败。",
+    "lift": "立即恢复",
+    "lift_failed": "无法恢复运行时"
+  },
   "rate_limits": {
     "title": "额度",
     "caption": "运行任务时由 CLI 上报",

@@ -2447,6 +2447,7 @@ export const AgentTaskSchema = z.object({
   autopilot_run_id: z.string().optional(),
   parent_task_id: z.string().optional(),
   attempt: z.number().optional(),
+  fire_at: z.string().optional().catch(undefined),
   trigger_comment_id: z.string().optional(),
   // Coverage is additive display metadata. A mixed-version or partially
   // upgraded server must not make one malformed optional field erase the

@@ -88,7 +88,7 @@ Transient faults — a runtime going briefly offline, a daemon restart, an execu
 
 Errors returned by the agent itself are usually not retried automatically. Expired credentials, exhausted quota, misconfiguration, or a model unable to complete the request all need the cause fixed first, then a manual retry.
 
-A provider limit is the exception: a rate limit, a provider server error, or a used-up subscription window (such as Claude Code's session or weekly limit) is retried automatically once the provider accepts requests again. For a used-up window, the run waits until the reset time the tool reports, and its runtime takes no new runs until then, so the rest of its queue waits instead of failing on the same limit.
+A provider limit is the exception: a rate limit, a provider server error, or a used-up subscription window (such as Claude Code's session or weekly limit) is retried automatically once the provider accepts requests again. For a used-up window, the run waits until the reset time the tool reports, and its runtime takes no new runs until then, so the rest of its queue waits instead of failing on the same limit. The runtime page shows the pause, and its owner or a workspace admin can resume it early, for example after switching the tool to another account. A waiting retry appears in the issue's execution log with its scheduled time; run it now or cancel it from there.
 
 An Autopilot's **run only** mode does not retry automatically, to avoid overlapping with the next scheduled run. The **create issue** mode produces regular issue runs, so infrastructure failures still retry under the rules above. Both modes show their final result in the Autopilot run history.
 
