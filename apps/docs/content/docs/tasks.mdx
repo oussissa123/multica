@@ -86,7 +86,7 @@ The execution log also totals the issue's **Spent**, **Tokens**, and **Agent tim
 
 Transient faults — a runtime going briefly offline, a daemon restart, an execution timeout, or a network interruption in the AI coding tool — can trigger an automatic retry. A regular run executes at most twice by default; tool network interruptions get up to three attempts.
 
-Errors returned by the agent itself are usually not retried automatically. Expired credentials, exhausted quota, misconfiguration, or a model unable to complete the request all need the cause fixed first, then a manual retry.
+Errors returned by the agent itself are usually not retried automatically. When a person has to fix the cause on the runtime's machine or account (expired credentials, an exhausted balance, a missing key, a missing or outdated CLI), the run is rechecked on a long backoff and runs right away once another run on the same runtime succeeds; fix the cause, then use run now on the waiting retry if you don't want to wait. A model unable to complete the request needs the cause fixed first, then a manual retry.
 
 A provider limit is the exception: a rate limit, a provider server error, or a used-up subscription window (such as Claude Code's session or weekly limit) is retried automatically once the provider accepts requests again. For a used-up window, the run waits until the reset time the tool reports, and its runtime takes no new runs until then, so the rest of its queue waits instead of failing on the same limit. The runtime page shows the pause, and its owner or a workspace admin can resume it early, for example after switching the tool to another account. A waiting retry appears in the issue's execution log with its scheduled time; run it now or cancel it from there.
 
@@ -186,10 +186,11 @@ Automatic retry covers only the transient faults below, and only applies to runs
 | Provider rate limit (429/529) | Up to 6; each retry waits 1, 5, 15, 30, then 60 minutes, or longer when the provider asks for it |
 | Provider server error (5xx) | Up to 3; retries wait about 30 seconds, then 2 minutes |
 | Subscription usage window used up | Up to 4; each retry starts a few minutes after the reset the tool reports (1 hour when it reports none); a reset more than 7 days away is not retried |
+| Sign-in, configuration, CLI or credit to fix | Up to 4 rechecks, after about 30 minutes, 2 hours, 8 hours and 24 hours; runs right away once another run on the same runtime succeeds |
 
-The three provider-limit rows are defaults. Workspace owners and admins can change each retry count (0 to 10), the longest wait, whether the runtime pauses, or turn these retries off, in **Settings → General → Automatic retries**.
+These provider-limit and recheck rows are defaults. Workspace owners and admins can change each retry count (0 to 10), the longest wait, whether the runtime pauses, or turn these retries off, in **Settings → General → Automatic retries**.
 
-All other failure reasons (auth, quota, configuration, model, and so on) never retry automatically; fix the cause first, then retry manually.
+All other failure reasons (model, context, process, and so on) never retry automatically; fix the cause first, then retry manually.
 
 ## Next steps
 

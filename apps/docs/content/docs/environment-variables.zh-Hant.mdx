@@ -47,7 +47,7 @@ MULTICA_PUBLIC_URL=https://api.multica.example.com
 | `LOG_LEVEL` | 應用預設 | 日誌級別 |
 | `MULTICA_SHUTDOWN_HOLD_DURATION` | `0` | 收到終止訊號後，開始優雅退出前等待多久 |
 | `MULTICA_RUNTIME_RECONNECT_GRACE` | `3h` | 執行時離線後可重新連線且不終止在途執行的寬限時間；低於 `150s` 時按 `150s` 處理 |
-| `MULTICA_RECOVERY_ENABLED` | `true` | 對遇到服務商限制（限流、服務端錯誤、訂閱用量視窗用完）的執行自動重試，並在用量視窗重置前暫停該執行環境；設為 `false` 時這類執行直接失敗 |
+| `MULTICA_RECOVERY_ENABLED` | `true` | 對遇到服務商限制（限流、服務端錯誤、訂閱用量視窗用完）或等待人工修正（登入、設定、CLI、餘額）的執行自動重試，並在用量視窗重置前暫停該執行環境；設為 `false` 時這類執行直接失敗 |
 
 在 Kubernetes 中設定 shutdown hold 時，`terminationGracePeriodSeconds` 要大於 hold 與實際退出所需時間之和。
 

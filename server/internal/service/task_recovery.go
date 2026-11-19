@@ -45,19 +45,37 @@ const (
 	usageWindowDefaultWait = time.Hour
 )
 
-// rateLimitBackoff and serverErrorBackoff are indexed by the failed attempt
-// number minus one; the last entry repeats.
+// rateLimitBackoff, serverErrorBackoff and awaitingFixBackoff are indexed by
+// the failed attempt number minus one; the last entry repeats.
 var (
 	rateLimitBackoff   = []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, 30 * time.Minute, time.Hour}
 	serverErrorBackoff = []time.Duration{30 * time.Second, 2 * time.Minute}
+	// A person has to act first, so rechecks start late and spread out: a
+	// recheck before the fix only fails fast at startup again.
+	awaitingFixBackoff = []time.Duration{30 * time.Minute, 2 * time.Hour, 8 * time.Hour, 24 * time.Hour}
 )
 
-// providerLimitAttemptCeilings are the hard caps retryEligible applies; the
-// workspace policy's own budget, at or below them, is enforced by planRetry.
-var providerLimitAttemptCeilings = map[string]int32{
-	string(taskfailure.ReasonAgentProviderUsageWindow):         MaxRecoveryRetries + 1,
-	string(taskfailure.ReasonAgentProviderCapacityOrRateLimit): MaxRecoveryRetries + 1,
-	string(taskfailure.ReasonAgentProviderServerError):         MaxRecoveryRetries + 1,
+// awaitingFixReasons are failures a person fixes on the runtime's machine or
+// account (sign in again, set the missing key, install or upgrade the CLI,
+// top up the balance). The run is rechecked on a long backoff, and pulled
+// forward as soon as another run on the same runtime succeeds.
+var awaitingFixReasons = map[string]bool{
+	string(taskfailure.ReasonAgentProviderAuthOrAccess):      true,
+	string(taskfailure.ReasonAgentMissingConfig):             true,
+	string(taskfailure.ReasonAgentRuntimeMissingExecutable):  true,
+	string(taskfailure.ReasonAgentRuntimeVersionUnsupported): true,
+	string(taskfailure.ReasonAgentProviderQuotaLimit):        true,
+}
+
+// policyAttemptCeiling is the hard cap retryEligible applies to the reasons
+// the workspace recovery policy governs; the policy's own budget, at or below
+// it, is enforced by planRetry.
+const policyAttemptCeiling = MaxRecoveryRetries + 1
+
+var providerLimitReasons = map[string]bool{
+	string(taskfailure.ReasonAgentProviderUsageWindow):         true,
+	string(taskfailure.ReasonAgentProviderCapacityOrRateLimit): true,
+	string(taskfailure.ReasonAgentProviderServerError):         true,
 }
 
 // providerLimitRecoveryEnabled is the operator kill switch
@@ -69,8 +87,13 @@ func providerLimitRecoveryEnabled() bool {
 }
 
 func isProviderLimitReason(reason string) bool {
-	_, ok := providerLimitAttemptCeilings[reason]
-	return ok
+	return providerLimitReasons[reason]
+}
+
+// isPolicyReason reports whether the workspace recovery policy governs a
+// failure reason's retries.
+func isPolicyReason(reason string) bool {
+	return providerLimitReasons[reason] || awaitingFixReasons[reason]
 }
 
 // retryPlan is when the next attempt of a failed task should run.
@@ -100,7 +123,7 @@ func (p retryPlan) attemptCeiling(reason string, taskMaxAttempts int32) int32 {
 // recovery policy for provider-limit reasons.
 func (s *TaskService) retryPlanFor(ctx context.Context, parent db.AgentTaskQueue, reason, errMsg string, now time.Time) (retryPlan, bool) {
 	policy := DefaultRecoveryPolicy()
-	if isProviderLimitReason(reason) {
+	if isPolicyReason(reason) {
 		policy = s.recoveryPolicyFor(ctx, parent)
 	}
 	return s.planRetry(ctx, parent, reason, errMsg, now, policy)
@@ -112,7 +135,7 @@ func (s *TaskService) retryPlanFor(ctx context.Context, parent db.AgentTaskQueue
 // window still sets throttleUntil then: the account is out either way, and
 // the rest of the runtime's queue should wait rather than fail.
 func (s *TaskService) planRetry(ctx context.Context, parent db.AgentTaskQueue, reason, errMsg string, now time.Time, policy RecoveryPolicy) (plan retryPlan, retry bool) {
-	if !isProviderLimitReason(reason) {
+	if !isPolicyReason(reason) {
 		if delay := retryDelayForAttempt(reason, parent.Attempt); delay > 0 {
 			return retryPlan{fireAt: now.Add(delay)}, true
 		}
@@ -143,10 +166,44 @@ func (s *TaskService) planRetry(ctx context.Context, parent db.AgentTaskQueue, r
 		}
 		plan.fireAt = now.Add(jitter(wait, 0.2))
 		return plan, retry && wait <= policy.maxWait()
-	default: // provider server error
+	case string(taskfailure.ReasonAgentProviderServerError):
 		plan.fireAt = now.Add(jitter(backoffFor(serverErrorBackoff, parent.Attempt), 0.2))
 		plan.hintSource = "backoff"
 		return plan, retry
+	default: // awaiting a person's fix
+		wait := backoffFor(awaitingFixBackoff, parent.Attempt)
+		plan.fireAt = now.Add(jitter(wait, 0.2))
+		plan.hintSource = "awaiting_fix"
+		return plan, retry && wait <= policy.maxWait()
+	}
+}
+
+// pullForwardRetriesAwaitingFix runs a runtime's waiting rechecks now that a
+// run there has succeeded. Best-effort: a missed pull-forward only means the
+// recheck runs at its scheduled time.
+func (s *TaskService) pullForwardRetriesAwaitingFix(ctx context.Context, runtimeID pgtype.UUID) {
+	if !runtimeID.Valid || !providerLimitRecoveryEnabled() {
+		return
+	}
+	reasons := make([]string, 0, len(awaitingFixReasons))
+	for reason := range awaitingFixReasons {
+		reasons = append(reasons, reason)
+	}
+	pulled, err := s.Queries.PullForwardRetriesAwaitingFix(ctx, db.PullForwardRetriesAwaitingFixParams{
+		RuntimeID: runtimeID,
+		Reasons:   reasons,
+	})
+	if err != nil {
+		slog.Warn("pull forward retries awaiting a fix failed", "runtime_id", util.UUIDToString(runtimeID), "error", err)
+		return
+	}
+	if len(pulled) == 0 {
+		return
+	}
+	slog.Info("retries awaiting a fix pulled forward: a run on their runtime succeeded",
+		"runtime_id", util.UUIDToString(runtimeID), "count", len(pulled))
+	if err := s.PromoteDueDeferredTasksForRuntime(ctx, runtimeID); err != nil {
+		slog.Warn("promote pulled-forward retries failed", "runtime_id", util.UUIDToString(runtimeID), "error", err)
 	}
 }
 

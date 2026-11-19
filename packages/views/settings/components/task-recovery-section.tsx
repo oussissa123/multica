@@ -24,13 +24,14 @@ import {
 import { useT } from "../../i18n";
 import { SettingsCard, SettingsRow, SettingsSection } from "./settings-layout";
 
-type RetryField = "usage_window_retries" | "rate_limit_retries" | "server_error_retries";
+type RetryField = "usage_window_retries" | "rate_limit_retries" | "server_error_retries" | "awaiting_fix_retries";
 
 const RETRY_COUNTS = Array.from({ length: MAX_RECOVERY_RETRIES + 1 }, (_, n) => n);
 const WAIT_HOURS = [1, 6, 24, 72, 168];
 
 /**
- * How runs stopped by a provider limit are retried in this workspace. Members
+ * How runs stopped by a provider limit, or by something a person fixes, are
+ * retried in this workspace. Members
  * see the policy; owners and admins change it. Each change saves at once.
  */
 export function TaskRecoverySection({ canManage }: { canManage: boolean }) {
@@ -70,8 +71,8 @@ export function TaskRecoverySection({ canManage }: { canManage: boolean }) {
   const locked = !canManage || saving;
   const detailLocked = locked || !policy.enabled;
 
-  const retryRow = (field: RetryField, label: string) => (
-    <SettingsRow anchor={`task-recovery-${field}`} label={label} size="select">
+  const retryRow = (field: RetryField, label: string, description?: string) => (
+    <SettingsRow anchor={`task-recovery-${field}`} label={label} description={description} size="select">
       <Select
         items={RETRY_COUNTS.map((n) => ({ value: String(n), label: retryLabel(n) }))}
         value={String(policy[field])}
@@ -122,6 +123,11 @@ export function TaskRecoverySection({ canManage }: { canManage: boolean }) {
         {retryRow("usage_window_retries", t(($) => $.task_recovery.usage_window_label))}
         {retryRow("rate_limit_retries", t(($) => $.task_recovery.rate_limit_label))}
         {retryRow("server_error_retries", t(($) => $.task_recovery.server_error_label))}
+        {retryRow(
+          "awaiting_fix_retries",
+          t(($) => $.task_recovery.awaiting_fix_label),
+          t(($) => $.task_recovery.awaiting_fix_description),
+        )}
         <SettingsRow
           anchor="task-recovery-max-wait"
           label={t(($) => $.task_recovery.max_wait_label)}

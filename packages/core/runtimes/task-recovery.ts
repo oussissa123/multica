@@ -2,7 +2,8 @@ import type { Workspace } from "../types";
 
 /**
  * A workspace's retry policy for runs stopped by a provider limit (rate limit,
- * provider server error, used-up subscription window). Stored under
+ * provider server error, used-up subscription window) or by something a
+ * person fixes (sign-in, configuration, CLI install, credit). Stored under
  * `settings.task_recovery`; the server reads the same fields with the same
  * defaults and bounds (server/internal/service/task_recovery_policy.go).
  */
@@ -13,6 +14,11 @@ export interface TaskRecoverySettings {
   usage_window_retries: number;
   rate_limit_retries: number;
   server_error_retries: number;
+  /**
+   * Rechecks of runs that failed on something a person fixes (sign-in,
+   * configuration, CLI install, credit), on a long backoff.
+   */
+  awaiting_fix_retries: number;
   /** A retry the provider would make wait longer is not made. */
   max_wait_hours: number;
 }
@@ -27,6 +33,7 @@ export const DEFAULT_TASK_RECOVERY: TaskRecoverySettings = {
   usage_window_retries: 3,
   rate_limit_retries: 5,
   server_error_retries: 2,
+  awaiting_fix_retries: 4,
   max_wait_hours: MAX_RECOVERY_WAIT_HOURS,
 };
 
@@ -43,7 +50,9 @@ export function deriveTaskRecoverySettings(
   const stored = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const flag = (key: "enabled" | "pause_runtime") =>
     typeof stored[key] === "boolean" ? (stored[key] as boolean) : DEFAULT_TASK_RECOVERY[key];
-  const count = (key: "usage_window_retries" | "rate_limit_retries" | "server_error_retries") =>
+  const count = (
+    key: "usage_window_retries" | "rate_limit_retries" | "server_error_retries" | "awaiting_fix_retries",
+  ) =>
     wholeInRange(stored[key], 0, MAX_RECOVERY_RETRIES) ? stored[key] : DEFAULT_TASK_RECOVERY[key];
   return {
     enabled: flag("enabled"),
@@ -51,6 +60,7 @@ export function deriveTaskRecoverySettings(
     usage_window_retries: count("usage_window_retries"),
     rate_limit_retries: count("rate_limit_retries"),
     server_error_retries: count("server_error_retries"),
+    awaiting_fix_retries: count("awaiting_fix_retries"),
     max_wait_hours: wholeInRange(stored.max_wait_hours, 1, MAX_RECOVERY_WAIT_HOURS)
       ? stored.max_wait_hours
       : DEFAULT_TASK_RECOVERY.max_wait_hours,

@@ -143,6 +143,8 @@
     "usage_window_label": "Fenêtre d'usage épuisée",
     "rate_limit_label": "Limite de débit",
     "server_error_label": "Erreur serveur du fournisseur",
+    "awaiting_fix_label": "Connexion, configuration ou crédit à corriger",
+    "awaiting_fix_description": "Revérifié après 30 minutes, 2 heures, 8 heures, puis chaque jour, et tout de suite dès qu'une autre exécution réussit sur le même runtime.",
     "max_wait_label": "Attente maximale",
     "max_wait_description": "Une relance qui devrait attendre plus longtemps n'est pas faite ; l'exécution reste en échec.",
     "retries_none": "Ne pas relancer",

@@ -18,6 +18,7 @@ describe("deriveTaskRecoverySettings", () => {
             usage_window_retries: 1,
             rate_limit_retries: 0,
             server_error_retries: 10,
+            awaiting_fix_retries: 1,
             max_wait_hours: 24,
           },
         },
@@ -28,6 +29,7 @@ describe("deriveTaskRecoverySettings", () => {
       usage_window_retries: 1,
       rate_limit_retries: 0,
       server_error_retries: 10,
+      awaiting_fix_retries: 1,
       max_wait_hours: 24,
     });
   });
