@@ -722,6 +722,16 @@ func NormalizeDaemonReason(reason, rawError string) Reason {
 		strings.Contains(strings.ToLower(rawError), concurrentRequestLimitWitness) {
 		return ReasonAgentProviderCapacityOrRateLimit
 	}
+	// A daemon predating ReasonAgentProviderUsageWindow files a used-up
+	// subscription window ("You've hit your session limit · resets 2pm") as
+	// provider_quota_limit, or in the 403 buckets above. Left there, the run is
+	// rechecked like a prepaid balance and the runtime is never paused, so the
+	// rest of its queue fails on the same limit. Classify must agree, so a
+	// billing message keeps the quota reason.
+	if (reason == string(ReasonAgentProviderQuotaLimit) || legacyUsageLimit403Reasons[reason]) &&
+		Classify(rawError) == ReasonAgentProviderUsageWindow {
+		return ReasonAgentProviderUsageWindow
+	}
 	if legacyUsageLimit403Reasons[reason] && isUsageLimit403(strings.ToLower(rawError)) {
 		return ReasonAgentProviderQuotaLimit
 	}

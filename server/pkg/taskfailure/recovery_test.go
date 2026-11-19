@@ -48,3 +48,27 @@ func TestClassifyUsageWindowVersusBilling(t *testing.T) {
 		}
 	}
 }
+
+// An installed daemon predating provider_usage_window reports a used-up
+// subscription window as provider_quota_limit (or in a 403 bucket); the server
+// must still recognise it, or the run is never retried at the reset.
+func TestNormalizeDaemonReasonUpgradesUsageWindow(t *testing.T) {
+	cases := []struct {
+		reason, raw string
+		want        Reason
+	}{
+		{"agent_error.provider_quota_limit", "You've hit your session limit · resets 2pm (UTC)", ReasonAgentProviderUsageWindow},
+		{"agent_error.provider_quota_limit", "You've hit your usage limit. Try again in 2 hours 13 minutes.", ReasonAgentProviderUsageWindow},
+		{"agent_error.provider_auth_or_access", "API Error: 403 usage limit exceeded, resets at 10:00", ReasonAgentProviderUsageWindow},
+		// Billing keeps its reason: nothing says the account recovers.
+		{"agent_error.provider_quota_limit", "API Error: 402 insufficient_balance", ReasonAgentProviderQuotaLimit},
+		{"agent_error.provider_quota_limit", "You've hit your limit", ReasonAgentProviderQuotaLimit},
+		// Only stale buckets are upgraded.
+		{"agent_error.provider_network", "You've hit your session limit · resets 2pm (UTC)", ReasonAgentProviderNetwork},
+	}
+	for _, tc := range cases {
+		if got := NormalizeDaemonReason(tc.reason, tc.raw); got != tc.want {
+			t.Errorf("NormalizeDaemonReason(%q, %q) = %q, want %q", tc.reason, tc.raw, got, tc.want)
+		}
+	}
+}

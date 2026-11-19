@@ -132,7 +132,9 @@ func TestUsageWindowFailureThrottlesRuntimeUntilReset(t *testing.T) {
 
 	svc := NewTaskService(q, pool, nil, events.New())
 	before := time.Now()
-	failed, err := svc.FailTask(ctx, parentID, "You've hit your session limit · resets 2pm (UTC)", "src-session", "/tmp/src-workdir", "", "", false, "", "")
+	// An installed daemon predating provider_usage_window reports the old
+	// billing reason; the server must still treat it as a usage window.
+	failed, err := svc.FailTask(ctx, parentID, "You've hit your session limit · resets 2pm (UTC)", "src-session", "/tmp/src-workdir", "", "agent_error.provider_quota_limit", false, "", "")
 	if err != nil {
 		t.Fatalf("FailTask: %v", err)
 	}
