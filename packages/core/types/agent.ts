@@ -92,6 +92,13 @@ export interface RuntimeDevice {
    * own limit still applies. Older backends omit the field.
    */
   max_concurrent_tasks?: number | null;
+  /**
+   * Set while the runtime takes no work because its agent CLI account used
+   * up a usage window; queued runs wait until then. `throttle_reason` is the
+   * failure reason that paused it. Older backends omit both.
+   */
+  throttled_until?: string | null;
+  throttle_reason?: string | null;
   last_seen_at: string | null;
   created_at: string;
   updated_at: string;
@@ -368,6 +375,12 @@ export interface AgentTask {
   parent_task_id?: string;
   /** 1-based attempt counter; >1 means this is a retry. */
   attempt?: number;
+  /**
+   * When a deferred task becomes claimable (an automatic retry waiting for a
+   * backoff or a provider limit reset). Omitted for other statuses and by
+   * older backends.
+   */
+  fire_at?: string;
   /** Set when an issue comment triggered this task (@mention or assignee comment). */
   trigger_comment_id?: string;
   /**

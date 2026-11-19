@@ -33,3 +33,19 @@ describe("runtime concurrency cap response contract", () => {
     expect(parsed.name).toBe("Claude");
   });
 });
+
+describe("runtime throttle response contract", () => {
+  it("preserves an active throttle from a new server", () => {
+    const parsed = AgentRuntimeSchema.parse({
+      id: "r",
+      workspace_id: "w",
+      throttled_until: "2026-11-18T14:02:00Z",
+      throttle_reason: "agent_error.provider_usage_window",
+    });
+    expect(parsed.throttled_until).toBe("2026-11-18T14:02:00Z");
+    expect(parsed.throttle_reason).toBe("agent_error.provider_usage_window");
+  });
+  it.each([undefined, 42, {}])("reads an older or malformed server as not throttled: %j", (throttled_until) => {
+    expect(AgentRuntimeSchema.parse({ id: "r", workspace_id: "w", throttled_until }).throttled_until).toBeNull();
+  });
+});

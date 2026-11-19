@@ -30,6 +30,54 @@ func (q *Queries) GetRuntimeRateLimit(ctx context.Context, runtimeID pgtype.UUID
 	return i, err
 }
 
+const liftRuntimeThrottleObservedAfter = `-- name: LiftRuntimeThrottleObservedAfter :execrows
+UPDATE agent_runtime
+SET throttled_until = NULL,
+    throttle_reason = NULL,
+    throttled_at = NULL
+WHERE id = $1
+  AND throttled_until > now()
+  AND throttled_at < $2::timestamptz
+`
+
+type LiftRuntimeThrottleObservedAfterParams struct {
+	ID         pgtype.UUID        `json:"id"`
+	ObservedAt pgtype.Timestamptz `json:"observed_at"`
+}
+
+// Lifts a throttle early when the CLI reports a snapshot with room left. The
+// snapshot must be observed after the throttle was set: an older report
+// predates the exhaustion and says nothing about the account now.
+func (q *Queries) LiftRuntimeThrottleObservedAfter(ctx context.Context, arg LiftRuntimeThrottleObservedAfterParams) (int64, error) {
+	result, err := q.db.Exec(ctx, liftRuntimeThrottleObservedAfter, arg.ID, arg.ObservedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const throttleRuntime = `-- name: ThrottleRuntime :exec
+UPDATE agent_runtime
+SET throttled_until = GREATEST(throttled_until, $1::timestamptz),
+    throttle_reason = $2::text,
+    throttled_at = now()
+WHERE id = $3
+`
+
+type ThrottleRuntimeParams struct {
+	ThrottledUntil pgtype.Timestamptz `json:"throttled_until"`
+	ThrottleReason string             `json:"throttle_reason"`
+	ID             pgtype.UUID        `json:"id"`
+}
+
+// Holds back claims on a runtime until its usage window resets. Concurrent
+// failures keep the latest reset (GREATEST ignores the NULL of an unthrottled
+// runtime).
+func (q *Queries) ThrottleRuntime(ctx context.Context, arg ThrottleRuntimeParams) error {
+	_, err := q.db.Exec(ctx, throttleRuntime, arg.ThrottledUntil, arg.ThrottleReason, arg.ID)
+	return err
+}
+
 const upsertRuntimeRateLimit = `-- name: UpsertRuntimeRateLimit :exec
 INSERT INTO runtime_rate_limit (runtime_id, workspace_id, snapshot, observed_at)
 VALUES ($1, $2, $3, $4)

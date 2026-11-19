@@ -85,6 +85,7 @@
       "provider_network": "與模型服務的連線中斷，回覆沒能完成。檢查網路後重試。",
       "provider_auth_or_access": "AI 代理的模型帳號登入已失效。重新登入後再試。",
       "provider_quota_limit": "AI 代理的模型帳號額度已用盡。充值或更換帳號後再試。",
+      "provider_usage_window": "AI 代理的訂閱用量上限已用完，尚未重置。重置後再試。",
       "provider_capacity_or_rate_limit": "模型服務繁忙或觸發了限流。稍後再試。",
       "context_overflow": "這次對話超出了模型的上下文長度。開一個新會話，或把需求拆得更小一些。",
       "runtime_missing_executable": "無法在這臺裝置上執行 AI 代理的 CLI。確認已正確安裝並且在 PATH 中，然後重試。",

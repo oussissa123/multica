@@ -73,6 +73,18 @@ export function useRevokeRuntimeWorkspaceAccess(wsId: string) {
   });
 }
 
+// useLiftRuntimeThrottle ends a usage-window pause early, e.g. after the CLI
+// was switched to another account.
+export function useLiftRuntimeThrottle(wsId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runtimeId: string) => api.liftRuntimeThrottle(runtimeId),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: runtimeKeys.all(wsId) });
+    },
+  });
+}
+
 // useUpdateRuntime patches editable fields on a runtime (visibility, custom
 // name). Invalidates the runtime list so the picker disabled-state and
 // display names recompute.

@@ -43,7 +43,8 @@ const (
 	EventTaskCompleted             = "task:completed" // running → completed
 	EventTaskFailed                = "task:failed"    // running → failed
 	EventTaskMessage               = "task:message"
-	EventTaskCancelled             = "task:cancelled" // * → cancelled
+	EventTaskCancelled             = "task:cancelled"   // * → cancelled
+	EventTaskRescheduled           = "task:rescheduled" // deferred fire time moved by a person
 
 	// Inbox events
 	EventInboxNew           = "inbox:new"

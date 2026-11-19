@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, Loader2, Maximize2, Square } from "@multica/ui/icons";
+import { ChevronRight, Loader2, Maximize2, Play, Square } from "@multica/ui/icons";
 import { toast } from "sonner";
 import { api } from "@multica/core/api";
 import { issueTasksOptions } from "@multica/core/issues/queries";
@@ -44,7 +44,8 @@ import {
 } from "./issue-run-timeline";
 import { canRetryRun, RetryRunButton } from "./retry-run-button";
 import { TaskStatusIcon } from "./task-status-icon";
-import { useFormatSpend, useStatusLabel, useTriggerText } from "./task-run-labels";
+import { isScheduledRetry, useFormatSpend, useStatusLabel, useTriggerText } from "./task-run-labels";
+import { ScheduledRetryStatus } from "./scheduled-retry-status";
 import { WakeupRunLabel } from "./wakeup-source-chip";
 
 // Sidebar summary: totals, a bounded cost chart, active runs and recent history.
@@ -120,7 +121,8 @@ export function ExecutionLogSection({
           // (waiting on a path lock), not terminal. Surfacing it here is
           // what tells the user the agent is alive and will resume.
           t.status === "waiting_local_directory" ||
-          t.status === "running",
+          t.status === "running" ||
+          isScheduledRetry(t),
       ).toSorted(compareActiveIssueTasks),
     [tasks],
   );
@@ -218,7 +220,7 @@ export function ExecutionLogSection({
             <button type="button" onClick={() => void refetch()} className="px-2 py-1 text-caption text-destructive underline">
               {t(($) => $.execution_log.load_failed_retry)}
             </button>
-          ) : tasks.every((task) => task.status === "deferred") ? (
+          ) : tasks.every((task) => task.status === "deferred" && !isScheduledRetry(task)) ? (
             <p className="px-2 py-1 text-caption text-muted-foreground">{t(($) => $.execution_log.empty)}</p>
           ) : latest.length > 0 && (
             <div className="space-y-0.5">
@@ -535,7 +537,21 @@ export function ActiveTaskRow({
   // Transcript only meaningful once messages exist — pure-queued and
   // waiting_local_directory tasks haven't streamed any agent output yet.
   const showTranscript =
-    task.status !== "queued" && task.status !== "waiting_local_directory";
+    task.status !== "queued" && task.status !== "waiting_local_directory" && task.status !== "deferred";
+
+  const scheduledRetry = isScheduledRetry(task);
+  const [resuming, setResuming] = useState(false);
+  const handleResume = () => {
+    if (resuming) return;
+    setResuming(true);
+    api.resumeTask(task.id).then(
+      () => setResuming(false),
+      (e: unknown) => {
+        toast.error(e instanceof Error ? e.message : t(($) => $.execution_log.run_now_failed));
+        setResuming(false);
+      },
+    );
+  };
 
   const handleCancel = async () => {
     if (cancelling) return;
@@ -589,11 +605,35 @@ export function ActiveTaskRow({
             <span className="text-info tabular-nums">{elapsed}</span>
             <span className="sr-only">{label}</span>
           </>
+        ) : scheduledRetry ? (
+          <ScheduledRetryStatus task={task} className={tone} />
         ) : (
           <span className={`${tone} min-w-0 truncate`}>{label}</span>
         )}
       </RowStatus>
       <RowActions>
+        {scheduledRetry && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={handleResume}
+                  disabled={resuming}
+                  aria-label={t(($) => $.execution_log.run_now_aria)}
+                />
+              }
+              className="flex items-center justify-center rounded-xs p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {resuming ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Play className="h-3.5 w-3.5" />
+              )}
+            </TooltipTrigger>
+            <TooltipContent>{t(($) => $.execution_log.run_now_tooltip)}</TooltipContent>
+          </Tooltip>
+        )}
         {showTranscript && (
           <TranscriptButton
             task={task}

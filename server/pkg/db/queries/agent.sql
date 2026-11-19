@@ -849,6 +849,7 @@ WHERE id = (
                 r.visibility = 'public'
                 OR r.visibility = 'private'
             )
+            AND (r.throttled_until IS NULL OR r.throttled_until <= now())
             AND r.status = 'online'
             AND COALESCE(r.last_seen_at, r.updated_at) >=
                 now() - make_interval(secs => @runtime_stale_secs::double precision)
@@ -2276,6 +2277,7 @@ WHERE atq.runtime_id = $1
             r.visibility = 'public'
             OR r.visibility = 'private'
         )
+        AND (r.throttled_until IS NULL OR r.throttled_until <= now())
   )
 ORDER BY atq.priority DESC, atq.created_at ASC;
 
@@ -2353,6 +2355,7 @@ WITH due AS (
           AND r.status = 'online'
           AND COALESCE(r.last_seen_at, r.updated_at) >=
               now() - make_interval(secs => @runtime_stale_secs::double precision)
+          AND (r.throttled_until IS NULL OR r.throttled_until <= now())
       )
       AND NOT EXISTS (
         SELECT 1 FROM agent_task_queue occupant
@@ -2397,6 +2400,7 @@ WHERE atq.runtime_id = ANY(@runtime_ids::uuid[])
             r.visibility = 'public'
             OR r.visibility = 'private'
         )
+        AND (r.throttled_until IS NULL OR r.throttled_until <= now())
   )
 ORDER BY atq.priority DESC, atq.created_at ASC;
 
@@ -2419,6 +2423,9 @@ WHERE t.runtime_id = ANY(@runtime_ids::uuid[])
       AND r.status = 'online'
       AND COALESCE(r.last_seen_at, r.updated_at) >=
           now() - make_interval(secs => @runtime_stale_secs::double precision)
+      -- An overdue row on a throttled runtime cannot be promoted yet, so it
+      -- must not advertise an immediate follow-up claim either.
+      AND (r.throttled_until IS NULL OR r.throttled_until <= now() OR t.fire_at > now())
   )
   AND (
     t.fire_at > now()
@@ -2456,6 +2463,7 @@ WITH due AS (
           AND r.status = 'online'
           AND COALESCE(r.last_seen_at, r.updated_at) >=
               now() - make_interval(secs => @runtime_stale_secs::double precision)
+          AND (r.throttled_until IS NULL OR r.throttled_until <= now())
       )
       AND NOT EXISTS (
         SELECT 1 FROM agent_task_queue occupant

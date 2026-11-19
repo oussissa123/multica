@@ -4961,6 +4961,7 @@ func (s *TaskService) CompleteTaskWithTransition(ctx context.Context, taskID pgt
 	s.publishRequeuedChatTasks(ctx, queuedChat)
 	slog.Info("task completed", "task_id", util.UUIDToString(task.ID), "issue_id", util.UUIDToString(task.IssueID))
 	s.captureTaskCompleted(ctx, task)
+	s.pullForwardRetriesAwaitingFix(ctx, task.RuntimeID)
 
 	// Invariant: every completed issue task must have at least one agent
 	// comment on the issue, so the user always sees something when a run
@@ -5324,31 +5325,42 @@ func (s *TaskService) FailTaskWithTransition(ctx context.Context, taskID pgtype.
 		retryOverlay     runtimeMCPOverlayData
 		retryFireAt      pgtype.Timestamptz
 		retryMaxAttempts pgtype.Int4
+		retryParent      db.AgentTaskQueue
+		plan             retryPlan
 	)
-	if retryableReasons[failureReason] {
+	if isRetryableReason(failureReason) {
 		if parent, perr := s.Queries.GetAgentTask(ctx, taskID); perr != nil {
 			slog.Warn("fail task auto-retry: load parent failed",
 				"task_id", util.UUIDToString(taskID), "error", perr)
-		} else if retryEligible(failureReason, parent) {
-			wantRetry = true
-			// Persist the reason-aware effective budget into the child so the
-			// retry chain self-describes (e.g. provider_network → max_attempts=3),
-			// rather than leaking a contradictory attempt=N/max_attempts=2 row.
-			retryMaxAttempts = pgtype.Int4{Int32: retryAttemptCeiling(failureReason, parent.MaxAttempts), Valid: true}
-			// Defer this attempt when the reason's schedule calls for a backoff
-			// (provider_network's final attempt waits ~5s); a zero delay leaves
-			// fire_at NULL so the child is created immediately-claimable.
-			if delay := retryDelayForAttempt(failureReason, parent.Attempt); delay > 0 {
-				retryFireAt = pgtype.Timestamptz{Time: time.Now().Add(delay), Valid: true}
-			}
-			if agent, aerr := s.Queries.GetAgent(ctx, parent.AgentID); aerr != nil {
-				// Best-effort: a missing overlay is not retry-fatal — the child
-				// simply runs without the Composio overlay.
-				slog.Warn("fail task auto-retry: load agent for overlay failed",
-					"task_id", util.UUIDToString(taskID),
-					"agent_id", util.UUIDToString(parent.AgentID), "error", aerr)
-			} else {
-				retryOverlay = s.buildRuntimeMCPOverlay(ctx, parent.OriginatorUserID, agent)
+		} else {
+			retryParent = parent
+			var retry bool
+			plan, retry = s.retryPlanFor(ctx, parent, failureReason, errMsg, time.Now())
+			switch {
+			case !retry:
+				slog.Info("fail task auto-retry skipped by the workspace recovery policy",
+					"task_id", util.UUIDToString(taskID), "failure_reason", failureReason)
+			case retryEligible(failureReason, parent):
+				wantRetry = true
+				// Persist the reason-aware effective budget into the child so the
+				// retry chain self-describes (e.g. provider_network → max_attempts=3),
+				// rather than leaking a contradictory attempt=N/max_attempts=2 row.
+				retryMaxAttempts = pgtype.Int4{Int32: plan.attemptCeiling(failureReason, parent.MaxAttempts), Valid: true}
+				// Defer this attempt when the reason's schedule calls for a backoff;
+				// a zero fireAt leaves fire_at NULL so the child is created
+				// immediately-claimable.
+				if !plan.fireAt.IsZero() {
+					retryFireAt = pgtype.Timestamptz{Time: plan.fireAt, Valid: true}
+				}
+				if agent, aerr := s.Queries.GetAgent(ctx, parent.AgentID); aerr != nil {
+					// Best-effort: a missing overlay is not retry-fatal — the child
+					// simply runs without the Composio overlay.
+					slog.Warn("fail task auto-retry: load agent for overlay failed",
+						"task_id", util.UUIDToString(taskID),
+						"agent_id", util.UUIDToString(parent.AgentID), "error", aerr)
+				} else {
+					retryOverlay = s.buildRuntimeMCPOverlay(ctx, parent.OriginatorUserID, agent)
+				}
 			}
 		}
 	}
@@ -5618,6 +5630,8 @@ func (s *TaskService) FailTaskWithTransition(ctx context.Context, taskID pgtype.
 	}
 
 	slog.Warn("task failed", "task_id", util.UUIDToString(task.ID), "issue_id", util.UUIDToString(task.IssueID), "error", errMsg, "failure_reason", failureReason)
+	// The account's limit holds whether or not this task got a retry.
+	s.applyRetryThrottle(ctx, retryParent, failureReason, plan)
 	s.captureTaskFailed(ctx, task)
 	s.publishRequeuedChatTasks(ctx, queuedChat)
 
@@ -5730,6 +5744,14 @@ var retryableReasons = map[string]bool{
 	string(taskfailure.ReasonSkillBundleUnavailable): true,
 }
 
+// isRetryableReason reports whether the auto-retry path acts on a failure
+// reason: the infrastructure allowlist above, plus the reasons the workspace
+// recovery policy governs (provider limits, and failures a person fixes),
+// which are retried after a backoff (task_recovery.go).
+func isRetryableReason(reason string) bool {
+	return retryableReasons[reason] || (isPolicyReason(reason) && providerLimitRecoveryEnabled())
+}
+
 // runtime_offline retries start deferred, not queued: their positive fire_at
 // routes them through health-gated promotion after a fresh runtime heartbeat
 // returns. The queue sweeper also exempts this retry lineage, covering the race
@@ -5765,6 +5787,9 @@ func retryAttemptCeiling(reason string, taskMaxAttempts int32) int32 {
 	}
 	if reason == string(taskfailure.ReasonAgentProviderNetwork) && taskMaxAttempts < providerNetworkMaxAttempts {
 		return providerNetworkMaxAttempts
+	}
+	if isPolicyReason(reason) && taskMaxAttempts < policyAttemptCeiling {
+		return policyAttemptCeiling
 	}
 	return taskMaxAttempts
 }
@@ -5859,7 +5884,7 @@ func ResumeUnsafeFailure(failureReason, errorText string) bool {
 // a human may have edited in the meantime, so replaying the failed attempt is
 // never what the workspace wants.
 func retryEligible(failureReason string, t db.AgentTaskQueue) bool {
-	return retryableReasons[failureReason] &&
+	return isRetryableReason(failureReason) &&
 		t.Attempt < retryAttemptCeiling(failureReason, t.MaxAttempts) &&
 		!t.AutopilotRunID.Valid &&
 		!IsTriageTask(t) &&
@@ -5920,7 +5945,7 @@ func (s *TaskService) MaybeRetryFailedTask(ctx context.Context, parent db.AgentT
 	if parent.FailureReason.Valid {
 		reason = parent.FailureReason.String
 	}
-	if !retryableReasons[reason] {
+	if !isRetryableReason(reason) {
 		return nil, nil
 	}
 	// Use the reason-aware ceiling, not the raw max_attempts column, so an
@@ -5962,9 +5987,16 @@ func (s *TaskService) MaybeRetryFailedTask(ctx context.Context, parent db.AgentT
 	// final provider_network attempt ~5s via fire_at (zero delay leaves fire_at
 	// NULL for an immediate child), and write the reason-aware ceiling into the
 	// child's max_attempts so the retry chain stays self-consistent.
+	plan, ok := s.retryPlanFor(ctx, parent, reason, parent.Error.String, time.Now())
+	s.applyRetryThrottle(ctx, parent, reason, plan)
+	if !ok {
+		slog.Info("task auto-retry skipped by the workspace recovery policy",
+			"parent_task_id", util.UUIDToString(parent.ID), "reason", reason)
+		return nil, nil
+	}
 	var retryFireAt pgtype.Timestamptz
-	if delay := retryDelayForAttempt(reason, parent.Attempt); delay > 0 {
-		retryFireAt = pgtype.Timestamptz{Time: time.Now().Add(delay), Valid: true}
+	if !plan.fireAt.IsZero() {
+		retryFireAt = pgtype.Timestamptz{Time: plan.fireAt, Valid: true}
 	}
 	// Same advisory slot check as FailTask's path, for the same reason: skip the
 	// work when a successor is already visible. Losing the race is handled by
@@ -6005,7 +6037,7 @@ func (s *TaskService) MaybeRetryFailedTask(ctx context.Context, parent db.AgentT
 			NewTaskID:            dbid.NewV7(),
 			ID:                   parent.ID,
 			FireAt:               retryFireAt,
-			MaxAttempts:          pgtype.Int4{Int32: retryAttemptCeiling(reason, parent.MaxAttempts), Valid: true},
+			MaxAttempts:          pgtype.Int4{Int32: plan.attemptCeiling(reason, parent.MaxAttempts), Valid: true},
 			RuntimeMcpOverlay:    runtimeMCPOverlay.Overlay,
 			RuntimeConnectedApps: runtimeMCPOverlay.ConnectedApps,
 		})

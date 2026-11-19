@@ -28,6 +28,10 @@ vi.mock("./terminate-task-confirm-dialog", () => ({
     open ? <button type="button" onClick={onConfirm}>Confirm stop</button> : null,
 }));
 
+vi.mock("../../common/use-viewing-timezone", () => ({
+  useViewingTimezone: () => "UTC",
+}));
+
 vi.mock("@multica/core/workspace/hooks", () => ({
   useActorName: () => ({
     getActorName: () => "Lambda",
@@ -259,6 +263,15 @@ describe("subtree execution log", () => {
     expect(stop).toHaveBeenCalledWith("grandchild-issue", "deep-queued");
   });
 
+  it("lists scheduled retries among active runs but keeps deferred wakeups out", () => {
+    renderParent([
+      makeTask({ id: "retry", status: "deferred", started_at: null, parent_task_id: "first", fire_at: "2026-06-08T14:02:00Z", trigger_summary: "Retrying" }),
+      makeTask({ id: "wakeup", status: "deferred", started_at: null, wakeup_id: "w-1", trigger_summary: "Wakeup later" }),
+    ], []);
+    expect(screen.getByText(/^Retry Jun 8, 0?2:02/)).toBeInTheDocument();
+    expect(screen.queryByText("Wakeup later")).not.toBeInTheDocument();
+  });
+
   it("shows loading and a retryable error instead of keeping the parent's partial totals", async () => {
     vi.useRealTimers();
     const client = new ApiClient("https://api.example.test");
@@ -318,6 +331,38 @@ describe("ActiveTaskRow", () => {
     expect(jump).toHaveTextContent("Started from comment");
     fireEvent.click(jump);
     expect(onJump).toHaveBeenCalledOnce();
+  });
+
+  it("shows a scheduled retry's time and runs it now on request", async () => {
+    const client = new ApiClient("https://api.example.test");
+    setApiInstance(client);
+    const resume = vi.spyOn(client, "resumeTask").mockResolvedValue({} as never);
+    renderWithI18n(
+      <ActiveTaskRow
+        task={makeTask({
+          id: "retry-2",
+          status: "deferred",
+          started_at: null,
+          parent_task_id: "task-1",
+          attempt: 2,
+          fire_at: "2026-06-08T14:02:00Z",
+        })}
+        issueId="issue-1"
+      />,
+    );
+
+    expect(screen.getByText(/^Retry Jun 8, 0?2:02/)).toBeInTheDocument();
+    expect(screen.queryByText("View transcript")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel run" })).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Run this retry now" }));
+    });
+    expect(resume).toHaveBeenCalledWith("retry-2");
+  });
+
+  it("offers no run-now action on other active runs", () => {
+    renderWithI18n(<ActiveTaskRow task={makeTask({ status: "queued", started_at: null })} issueId="issue-1" />);
+    expect(screen.queryByRole("button", { name: "Run this retry now" })).not.toBeInTheDocument();
   });
 });
 

@@ -871,6 +871,7 @@
       "invalid_task_identity": "実行のエージェント情報が一致しません",
       "agent_error_provider_auth_or_access": "プロバイダーの認証に失敗しました",
       "agent_error_provider_quota_limit": "プロバイダーのクォータを使い切りました",
+      "agent_error_provider_usage_window": "プロバイダーの利用上限に達しました",
       "agent_error_provider_capacity_or_rate_limit": "プロバイダーによるレート制限",
       "agent_error_provider_server_error": "プロバイダーのサーバーエラー",
       "agent_error_provider_network": "プロバイダーへの接続でネットワークエラー",

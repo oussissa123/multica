@@ -133,6 +133,24 @@
     "delete_title": "이 퀵 액션을 삭제할까요?",
     "delete_description": "모든 태스크 사이드바에서 사라집니다. 과거 실행 기록은 실행 로그에 남습니다. 다시 쓸 수 있다면 보관을 선택하세요."
   },
+  "task_recovery": {
+    "title": "자동 재시도",
+    "enabled_label": "공급자 한도로 멈춘 실행 재시도",
+    "enabled_description": "rate limit, 공급자 서버 오류, 구독 사용 한도 소진은 공급자가 다시 요청을 받을 때 재시도됩니다.",
+    "pause_runtime_label": "한도가 초기화될 때까지 런타임 일시 중지",
+    "pause_runtime_description": "계정의 사용 한도가 소진되면 런타임은 초기화 전까지 새 실행을 받지 않으므로, 대기열이 실패하지 않고 기다립니다.",
+    "usage_window_label": "사용 한도 소진",
+    "rate_limit_label": "rate limit",
+    "server_error_label": "공급자 서버 오류",
+    "awaiting_fix_label": "로그인·설정·잔액 수정 필요",
+    "awaiting_fix_description": "30분, 2시간, 8시간 뒤, 이후 매일 다시 확인하며, 같은 런타임에서 다른 실행이 성공하면 바로 다시 확인합니다.",
+    "max_wait_label": "최대 대기 시간",
+    "max_wait_description": "이보다 오래 기다려야 하는 재시도는 하지 않으며, 실행은 실패 상태로 남습니다.",
+    "retries_none": "재시도 안 함",
+    "retries_count_other": "{{count}}회",
+    "wait_hours_other": "{{count}}시간",
+    "wait_days_other": "{{count}}일"
+  },
   "auto_save": {
     "saving": "저장 중…",
     "saved": "저장됨",

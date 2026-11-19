@@ -40,6 +40,7 @@ export type WSEventType =
   | "task:failed"
   | "task:message"
   | "task:cancelled"
+  | "task:rescheduled"
   | "inbox:new"
   | "inbox:read"
   | "inbox:unread"
@@ -693,6 +694,8 @@ export interface WSEventPayloadMap {
   "task:failed": TaskFailedPayload;
   "task:message": TaskMessagePayload;
   "task:cancelled": TaskCancelledPayload;
+  // A person moved a deferred task's fire time; same shape as task:queued.
+  "task:rescheduled": TaskQueuedPayload;
   "task:progress": unknown;
   "task:usage": TaskUsageUpdatedPayload;
   "inbox:new": InboxNewPayload;
