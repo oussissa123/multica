@@ -96,6 +96,7 @@
     "./runtimes/mutations": "./runtimes/mutations.ts",
     "./runtimes/custom-pricing-store": "./runtimes/custom-pricing-store.ts",
     "./runtimes/rate-limits": "./runtimes/rate-limits.ts",
+    "./runtimes/task-recovery": "./runtimes/task-recovery.ts",
     "./dashboard": "./dashboard/index.ts",
     "./dashboard/queries": "./dashboard/queries.ts",
     "./agents": "./agents/index.ts",

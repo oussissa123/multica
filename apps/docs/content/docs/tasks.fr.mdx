@@ -187,6 +187,8 @@ La relance automatique ne couvre que les défaillances transitoires ci-dessous, 
 | Erreur serveur du fournisseur (5xx) | Jusqu'à 3 ; les relances attendent environ 30 secondes, puis 2 minutes |
 | Fenêtre d'usage de l'abonnement épuisée | Jusqu'à 4 ; chaque relance démarre quelques minutes après la réinitialisation indiquée par l'outil (1 heure s'il n'en indique aucune) ; une réinitialisation à plus de 7 jours n'est pas relancée |
 
+Les trois lignes des limites du fournisseur sont des valeurs par défaut. Les propriétaires et administrateurs de l'espace de travail peuvent changer chaque nombre de relances (0 à 10), l'attente maximale, la mise en pause du runtime, ou désactiver ces relances, dans **Paramètres → Général → Relances automatiques**.
+
 Tous les autres motifs d'échec (authentification, quota, configuration, modèle, etc.) ne sont jamais relancés automatiquement ; corrigez d'abord la cause, puis relancez manuellement.
 
 ## Étapes suivantes

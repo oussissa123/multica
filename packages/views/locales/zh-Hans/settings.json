@@ -133,6 +133,22 @@
     "delete_title": "删除这条快捷操作？",
     "delete_description": "它会从所有任务侧边栏消失，历史运行记录仍保留在执行日志中。如果以后可能还要用，建议改为归档。"
   },
+  "task_recovery": {
+    "title": "自动重试",
+    "enabled_label": "重试因服务商限制而停止的运行",
+    "enabled_description": "限流、服务商服务端错误以及订阅用量窗口用完的情况，会在服务商重新接受请求时重试。",
+    "pause_runtime_label": "在限制重置前暂停运行时",
+    "pause_runtime_description": "账号的用量窗口用完后，运行时在重置前不再接新的运行，队列会等待而不会失败。",
+    "usage_window_label": "用量窗口用完",
+    "rate_limit_label": "限流",
+    "server_error_label": "服务商服务端错误",
+    "max_wait_label": "最长等待",
+    "max_wait_description": "需要等待更久的重试不会进行，运行保持失败。",
+    "retries_none": "不重试",
+    "retries_count_other": "{{count}} 次",
+    "wait_hours_other": "{{count}} 小时",
+    "wait_days_other": "{{count}} 天"
+  },
   "auto_save": {
     "saving": "正在保存…",
     "saved": "已保存",

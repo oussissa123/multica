@@ -134,6 +134,25 @@
     "no_target": "Sin objetivo",
     "no_target_hint": "Publica un mensaje sin mencionar a nadie."
   },
+  "task_recovery": {
+    "title": "Reintentos automáticos",
+    "enabled_label": "Reintentar las ejecuciones detenidas por un límite del proveedor",
+    "enabled_description": "Los límites de frecuencia, los errores de servidor del proveedor y las ventanas de uso agotadas se reintentan cuando el proveedor vuelve a aceptar solicitudes.",
+    "pause_runtime_label": "Pausar el runtime hasta que se restablezca el límite",
+    "pause_runtime_description": "Cuando se agota la ventana de uso de una cuenta, su runtime no acepta ejecuciones nuevas hasta el restablecimiento, así su cola espera en lugar de fallar.",
+    "usage_window_label": "Ventana de uso agotada",
+    "rate_limit_label": "Límite de frecuencia",
+    "server_error_label": "Error de servidor del proveedor",
+    "max_wait_label": "Espera máxima",
+    "max_wait_description": "No se hace un reintento que tendría que esperar más; la ejecución queda fallida.",
+    "retries_none": "No reintentar",
+    "retries_count_one": "{{count}} reintento",
+    "retries_count_other": "{{count}} reintentos",
+    "wait_hours_one": "{{count}} hora",
+    "wait_hours_other": "{{count}} horas",
+    "wait_days_one": "{{count}} día",
+    "wait_days_other": "{{count}} días"
+  },
   "auto_save": {
     "saving": "Guardando…",
     "saved": "Guardado",
