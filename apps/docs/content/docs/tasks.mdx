@@ -187,6 +187,8 @@ Automatic retry covers only the transient faults below, and only applies to runs
 | Provider server error (5xx) | Up to 3; retries wait about 30 seconds, then 2 minutes |
 | Subscription usage window used up | Up to 4; each retry starts a few minutes after the reset the tool reports (1 hour when it reports none); a reset more than 7 days away is not retried |
 
+The three provider-limit rows are defaults. Workspace owners and admins can change each retry count (0 to 10), the longest wait, whether the runtime pauses, or turn these retries off, in **Settings → General → Automatic retries**.
+
 All other failure reasons (auth, quota, configuration, model, and so on) never retry automatically; fix the cause first, then retry manually.
 
 ## Next steps

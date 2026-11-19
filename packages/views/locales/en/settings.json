@@ -134,6 +134,25 @@
     "delete_title": "Delete this quick action?",
     "delete_description": "It disappears from every issue sidebar. Past runs stay in the execution log. Archive instead if you may want it back."
   },
+  "task_recovery": {
+    "title": "Automatic retries",
+    "enabled_label": "Retry runs stopped by a provider limit",
+    "enabled_description": "Rate limits, provider server errors and used-up subscription windows are retried once the provider accepts requests again.",
+    "pause_runtime_label": "Pause the runtime until the limit resets",
+    "pause_runtime_description": "When an account's usage window is used up, its runtime takes no new runs until the reset, so its queue waits instead of failing.",
+    "usage_window_label": "Used-up usage window",
+    "rate_limit_label": "Rate limit",
+    "server_error_label": "Provider server error",
+    "max_wait_label": "Longest wait",
+    "max_wait_description": "A retry that would have to wait longer is not made; the run stays failed.",
+    "retries_none": "Don't retry",
+    "retries_count_one": "{{count}} retry",
+    "retries_count_other": "{{count}} retries",
+    "wait_hours_one": "{{count}} hour",
+    "wait_hours_other": "{{count}} hours",
+    "wait_days_one": "{{count}} day",
+    "wait_days_other": "{{count}} days"
+  },
   "auto_save": {
     "saving": "Saving…",
     "saved": "Saved",

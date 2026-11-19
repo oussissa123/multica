@@ -133,6 +133,22 @@
     "delete_title": "このクイックアクションを削除しますか？",
     "delete_description": "すべてのタスクのサイドバーから消えます。過去の記録は実行ログに残ります。後で使う可能性があればアーカイブを選んでください。"
   },
+  "task_recovery": {
+    "title": "自動リトライ",
+    "enabled_label": "プロバイダーの制限で止まった実行をリトライ",
+    "enabled_description": "レート制限、プロバイダーのサーバーエラー、サブスクリプションの利用枠の枯渇は、プロバイダーが再びリクエストを受け付けた時点でリトライされます。",
+    "pause_runtime_label": "制限のリセットまでランタイムを一時停止",
+    "pause_runtime_description": "アカウントの利用枠が尽きると、リセットまでランタイムは新しい実行を受け付けず、キューは失敗せずに待機します。",
+    "usage_window_label": "利用枠の枯渇",
+    "rate_limit_label": "レート制限",
+    "server_error_label": "プロバイダーのサーバーエラー",
+    "max_wait_label": "最大待機時間",
+    "max_wait_description": "これより長く待つ必要があるリトライは行わず、実行は失敗のままになります。",
+    "retries_none": "リトライしない",
+    "retries_count_other": "{{count}} 回",
+    "wait_hours_other": "{{count}} 時間",
+    "wait_days_other": "{{count}} 日"
+  },
   "auto_save": {
     "saving": "保存中…",
     "saved": "保存済み",

@@ -13,9 +13,9 @@ import (
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
-// rescheduleMaxAhead matches the horizon the server itself schedules retries
-// within (service.recoveryMaxHorizon).
-const rescheduleMaxAhead = 7 * 24 * time.Hour
+// rescheduleMaxAhead matches the longest wait a recovery policy may allow
+// (service.MaxRecoveryWaitHours).
+const rescheduleMaxAhead = service.MaxRecoveryWaitHours * time.Hour
 
 // ResumeDeferredTaskByUser moves a waiting automatic retry: with no fire_at it
 // runs as soon as its runtime can take it, otherwise at the given time.

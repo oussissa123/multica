@@ -63,8 +63,9 @@ func TestPlanRetryRateLimit(t *testing.T) {
 	now := time.Date(2026, time.November, 18, 12, 0, 0, 0, time.UTC)
 	svc := &TaskService{}
 	reason := "agent_error.provider_capacity_or_rate_limit"
+	policy := DefaultRecoveryPolicy()
 
-	plan, ok := svc.planRetry(context.Background(), db.AgentTaskQueue{Attempt: 1}, reason, "API Error: 429 Too Many Requests", now)
+	plan, ok := svc.planRetry(context.Background(), db.AgentTaskQueue{Attempt: 1}, reason, "API Error: 429 Too Many Requests", now, policy)
 	if !ok || plan.fireAt.Before(now.Add(48*time.Second)) || plan.fireAt.After(now.Add(72*time.Second)) {
 		t.Fatalf("first backoff = %s (ok=%v), want 1m ±20%%", plan.fireAt.Sub(now), ok)
 	}
@@ -72,18 +73,19 @@ func TestPlanRetryRateLimit(t *testing.T) {
 		t.Fatalf("a rate limit must not throttle the runtime")
 	}
 
-	plan, ok = svc.planRetry(context.Background(), db.AgentTaskQueue{Attempt: 1}, reason, "API Error: 429 (retry-after: 600)", now)
+	plan, ok = svc.planRetry(context.Background(), db.AgentTaskQueue{Attempt: 1}, reason, "API Error: 429 (retry-after: 600)", now, policy)
 	if !ok || plan.hintSource != "error_text" || plan.fireAt.Before(now.Add(8*time.Minute)) || plan.fireAt.After(now.Add(12*time.Minute)) {
 		t.Fatalf("retry-after longer than the backoff wins: got %s from %q", plan.fireAt.Sub(now), plan.hintSource)
 	}
 
-	plan, _ = svc.planRetry(context.Background(), db.AgentTaskQueue{Attempt: 9}, reason, "429", now)
+	policy.RateLimitRetries = MaxRecoveryRetries
+	plan, _ = svc.planRetry(context.Background(), db.AgentTaskQueue{Attempt: 9}, reason, "429", now, policy)
 	if plan.fireAt.Before(now.Add(48*time.Minute)) || plan.fireAt.After(now.Add(72*time.Minute)) {
 		t.Fatalf("backoff past the schedule repeats the last step: got %s", plan.fireAt.Sub(now))
 	}
 
-	if got := retryAttemptCeiling(reason, 2); got != rateLimitMaxAttempts {
-		t.Fatalf("retryAttemptCeiling = %d, want %d", got, rateLimitMaxAttempts)
+	if got := plan.attemptCeiling(reason, 2); got != MaxRecoveryRetries+1 {
+		t.Fatalf("attemptCeiling = %d, want the policy budget %d", got, MaxRecoveryRetries+1)
 	}
 	if got := retryAttemptCeiling(reason, 1); got != 1 {
 		t.Fatalf("max_attempts=1 disables retry, got ceiling %d", got)

@@ -48,6 +48,7 @@ import { AvatarUploadControl } from "../../common/avatar-upload-control";
 import { useNavigation } from "../../navigation";
 import { DeleteWorkspaceDialog } from "./delete-workspace-dialog";
 import { PrivateProjectsSection } from "./private-projects-section";
+import { TaskRecoverySection } from "./task-recovery-section";
 import { useT } from "../../i18n";
 import {
   SettingsCard,
@@ -479,6 +480,8 @@ export function WorkspaceTab() {
           </SettingsRow>
         </SettingsCard>
       </SettingsSection>
+
+      {membersFetched ? <TaskRecoverySection canManage={canManageWorkspace} /> : null}
 
       {membersFetched && isOwner ? <PrivateProjectsSection /> : null}
 

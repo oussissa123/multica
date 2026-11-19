@@ -134,6 +134,25 @@
     "delete_title": "Supprimer cette action rapide ?",
     "delete_description": "Elle disparaît de la barre latérale de toutes les tâches. Les exécutions passées restent dans le journal d'exécution. Archivez-la plutôt si vous pensez la réutiliser."
   },
+  "task_recovery": {
+    "title": "Relances automatiques",
+    "enabled_label": "Relancer les exécutions arrêtées par une limite du fournisseur",
+    "enabled_description": "Les limites de débit, les erreurs serveur du fournisseur et les fenêtres d'usage épuisées sont relancées dès que le fournisseur accepte de nouveau les requêtes.",
+    "pause_runtime_label": "Mettre le runtime en pause jusqu'à la réinitialisation",
+    "pause_runtime_description": "Quand la fenêtre d'usage d'un compte est épuisée, son runtime ne prend plus d'exécution jusqu'à la réinitialisation : sa file attend au lieu d'échouer.",
+    "usage_window_label": "Fenêtre d'usage épuisée",
+    "rate_limit_label": "Limite de débit",
+    "server_error_label": "Erreur serveur du fournisseur",
+    "max_wait_label": "Attente maximale",
+    "max_wait_description": "Une relance qui devrait attendre plus longtemps n'est pas faite ; l'exécution reste en échec.",
+    "retries_none": "Ne pas relancer",
+    "retries_count_one": "{{count}} relance",
+    "retries_count_other": "{{count}} relances",
+    "wait_hours_one": "{{count}} heure",
+    "wait_hours_other": "{{count}} heures",
+    "wait_days_one": "{{count}} jour",
+    "wait_days_other": "{{count}} jours"
+  },
   "auto_save": {
     "saving": "Enregistrement…",
     "saved": "Enregistré",

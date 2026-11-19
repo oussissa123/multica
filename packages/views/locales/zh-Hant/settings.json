@@ -133,6 +133,22 @@
     "delete_title": "刪除這條快捷操作？",
     "delete_description": "它會從所有任務側邊欄消失，歷史執行記錄仍保留在執行日誌中。如果以後可能還要用，建議改為歸檔。"
   },
+  "task_recovery": {
+    "title": "自動重試",
+    "enabled_label": "重試因服務商限制而停止的執行",
+    "enabled_description": "限流、服務商服務端錯誤以及訂閱用量視窗用完的情況，會在服務商重新接受請求時重試。",
+    "pause_runtime_label": "在限制重置前暫停執行環境",
+    "pause_runtime_description": "帳號的用量視窗用完後，執行環境在重置前不再接新的執行，佇列會等待而不會失敗。",
+    "usage_window_label": "用量視窗用完",
+    "rate_limit_label": "限流",
+    "server_error_label": "服務商服務端錯誤",
+    "max_wait_label": "最長等待",
+    "max_wait_description": "需要等待更久的重試不會進行，執行保持失敗。",
+    "retries_none": "不重試",
+    "retries_count_other": "{{count}} 次",
+    "wait_hours_other": "{{count}} 小時",
+    "wait_days_other": "{{count}} 天"
+  },
   "auto_save": {
     "saving": "正在儲存…",
     "saved": "已儲存",
