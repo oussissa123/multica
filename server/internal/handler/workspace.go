@@ -21,6 +21,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/logger"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/projectaccess"
+	"github.com/multica-ai/multica/server/internal/service"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
@@ -484,6 +485,12 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Settings != nil {
 		if incoming, ok := req.Settings.(map[string]any); ok {
+			if recovery, sent := incoming[service.WorkspaceSettingTaskRecovery]; sent {
+				if err := service.ValidateRecoverySetting(recovery); err != nil {
+					writeError(w, http.StatusBadRequest, err.Error())
+					return
+				}
+			}
 			// Only an old client's flip of the retired PR switch needs the
 			// stored value; see reconcilePRMergeSettings.
 			var stored map[string]any

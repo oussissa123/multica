@@ -1037,6 +1037,7 @@
       "invalid_task_identity": "Identité d'exécution incohérente",
       "agent_error_provider_auth_or_access": "Échec de l'authentification auprès du fournisseur",
       "agent_error_provider_quota_limit": "Quota du fournisseur épuisé",
+      "agent_error_provider_usage_window": "Limite d'utilisation du fournisseur atteinte",
       "agent_error_provider_capacity_or_rate_limit": "Limite de requêtes du fournisseur atteinte",
       "agent_error_provider_server_error": "Erreur du serveur du fournisseur",
       "agent_error_provider_network": "Erreur réseau lors de la connexion au fournisseur",

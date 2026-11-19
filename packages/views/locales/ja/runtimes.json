@@ -679,6 +679,12 @@
       "connected": "{{name}} が Multica に接続されました"
     }
   },
+  "throttle": {
+    "title": "{{time}} まで一時停止中",
+    "description": "アカウントの利用上限に達しました。キュー内の実行は失敗せず、リセットを待ちます。",
+    "lift": "今すぐ再開",
+    "lift_failed": "ランタイムを再開できませんでした"
+  },
   "rate_limits": {
     "title": "利用上限",
     "caption": "タスク実行中に CLI が報告",

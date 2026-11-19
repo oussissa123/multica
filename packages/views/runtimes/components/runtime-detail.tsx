@@ -56,6 +56,7 @@ import { HealthBadge, HealthIcon, shortDaemonId, useHealthLabel } from "./shared
 import { ProviderLogo } from "./provider-logo";
 import { UsageSection } from "./usage-section";
 import { RateLimitSection } from "./rate-limit-section";
+import { RuntimeThrottleNotice } from "./runtime-throttle-notice";
 import { DeleteRuntimeDialog } from "./delete-runtime-dialog";
 import { RuntimeAccessEditor, RuntimeAccessReadout } from "./runtime-access-editor";
 import { RuntimeConcurrencyField } from "./runtime-concurrency-field";
@@ -222,6 +223,8 @@ export function RuntimeDetail({
             }
             description={summary}
           />
+
+          <RuntimeThrottleNotice runtime={runtime} canEdit={!!canEditRuntime} />
 
           <ObjectSection
             title={t(($) => $.page.columns.agents)}

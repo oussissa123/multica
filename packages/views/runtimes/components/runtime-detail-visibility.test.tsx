@@ -116,6 +116,7 @@ vi.mock("@multica/core/paths", () => ({
 }));
 
 vi.mock("@multica/core/runtimes/mutations", () => ({
+  useLiftRuntimeThrottle: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateRuntime: () => ({
     mutate: (
       args: { runtimeId: string; patch: Record<string, unknown> },

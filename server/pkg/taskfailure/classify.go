@@ -61,8 +61,39 @@ func isUsageLimit403(lower string) bool {
 	return httpForbiddenCodeRe.MatchString(lower) && strings.Contains(lower, "usage limit")
 }
 
+// usageWindowWitnesses are phrases only a renewable subscription window
+// produces. usageLimitPhrases are shared with prepaid billing messages, so they
+// count as a usage window only when the text also says when the limit resets.
+var (
+	usageWindowWitnesses = []string{
+		"hit your session limit",
+		"hit your weekly limit",
+		"5-hour limit reached",
+		"weekly limit reached",
+		"session limit reached",
+		"usage limit reached",
+	}
+	usageLimitPhrases = []string{
+		"usage limit",
+		"you've hit your limit",
+		"you\u2019ve hit your limit",
+	}
+	usageResetMarkers = []string{"resets", "reset at", "try again in", "try again at"}
+)
+
+func isUsageWindowExhausted(lower string) bool {
+	if httpQuotaCodeRe.MatchString(lower) ||
+		containsAny(lower, "insufficient_balance", "balance is too low", "monthly usage limit") {
+		return false
+	}
+	if containsAny(lower, usageWindowWitnesses...) {
+		return true
+	}
+	return containsAny(lower, usageLimitPhrases...) && containsAny(lower, usageResetMarkers...)
+}
+
 // Classify maps a free-form error string from the agent runtime / CLI
-// to one of the 14 agent_error.* sub-reasons. Always returns a valid
+// to one of the 15 agent_error.* sub-reasons. Always returns a valid
 // Reason; falls back to ReasonAgentUnknown when no rule matches and for
 // empty input.
 //
@@ -120,6 +151,12 @@ func Classify(rawError string) Reason {
 	// rules below; this classification does not itself make the reason retryable.
 	case strings.Contains(lower, concurrentRequestLimitWitness):
 		return ReasonAgentProviderCapacityOrRateLimit
+
+	// A subscription usage window that names its reset recovers on its own,
+	// so it must beat both the 403 rule below and the billing rule 4, which
+	// would otherwise file it as an account that needs topping up.
+	case isUsageWindowExhausted(lower):
+		return ReasonAgentProviderUsageWindow
 
 	// Some providers (e.g. Kimi Code) report an exhausted usage window as HTTP
 	// 403, and Claude Code may prefix it with an access-token failure. It must
@@ -692,6 +729,16 @@ func NormalizeDaemonReason(reason, rawError string) Reason {
 	if legacyConcurrentRequestLimitReasons[reason] &&
 		strings.Contains(strings.ToLower(rawError), concurrentRequestLimitWitness) {
 		return ReasonAgentProviderCapacityOrRateLimit
+	}
+	// A daemon predating ReasonAgentProviderUsageWindow files a used-up
+	// subscription window ("You've hit your session limit · resets 2pm") as
+	// provider_quota_limit, or in the 403 buckets above. Left there, the run is
+	// rechecked like a prepaid balance and the runtime is never paused, so the
+	// rest of its queue fails on the same limit. Classify must agree, so a
+	// billing message keeps the quota reason.
+	if (reason == string(ReasonAgentProviderQuotaLimit) || legacyUsageLimit403Reasons[reason]) &&
+		Classify(rawError) == ReasonAgentProviderUsageWindow {
+		return ReasonAgentProviderUsageWindow
 	}
 	if legacyUsageLimit403Reasons[reason] && isUsageLimit403(strings.ToLower(rawError)) {
 		return ReasonAgentProviderQuotaLimit

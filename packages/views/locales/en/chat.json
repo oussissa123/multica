@@ -88,6 +88,7 @@
       "provider_network": "The connection to the model provider dropped before the reply finished. Check your network and try again.",
       "provider_auth_or_access": "The agent's model account isn't signed in any more. Sign in again, then retry.",
       "provider_quota_limit": "The agent's model account has run out of credit. Top it up or switch accounts, then retry.",
+      "provider_usage_window": "The agent's subscription usage limit is used up and has not reset yet. Try again after it resets.",
       "provider_capacity_or_rate_limit": "The model provider is busy or rate-limiting this account. Please try again in a moment.",
       "context_overflow": "This conversation got too long for the model. Start a new session, or break your request into smaller steps.",
       "runtime_missing_executable": "The agent's CLI couldn't be run on this machine. Check that it's installed correctly and on PATH, then retry.",

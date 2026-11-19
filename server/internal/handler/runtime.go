@@ -50,10 +50,15 @@ type AgentRuntimeResponse struct {
 	ProfileID *string `json:"profile_id"`
 	// MaxConcurrentTasks caps tasks running at once across every agent bound
 	// to this runtime (GitHub #9626); null means no runtime-wide cap.
-	MaxConcurrentTasks *int32  `json:"max_concurrent_tasks"`
-	LastSeenAt         *string `json:"last_seen_at"`
-	CreatedAt          string  `json:"created_at"`
-	UpdatedAt          string  `json:"updated_at"`
+	MaxConcurrentTasks *int32 `json:"max_concurrent_tasks"`
+	// ThrottledUntil is set while the runtime takes no work because its
+	// agent CLI account used up a usage window; ThrottleReason names the
+	// failure reason that throttled it. Both are null otherwise.
+	ThrottledUntil *string `json:"throttled_until"`
+	ThrottleReason *string `json:"throttle_reason"`
+	LastSeenAt     *string `json:"last_seen_at"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
 }
 
 func runtimeToResponse(rt db.AgentRuntime) AgentRuntimeResponse {
@@ -82,6 +87,8 @@ func runtimeToResponse(rt db.AgentRuntime) AgentRuntimeResponse {
 		SharedWith:         runtimeSharedWithStrings(rt.SharedWith),
 		ProfileID:          uuidToPtr(rt.ProfileID),
 		MaxConcurrentTasks: int4ToPtr(rt.MaxConcurrentTasks),
+		ThrottledUntil:     activeThrottleUntil(rt),
+		ThrottleReason:     activeThrottleReason(rt),
 		LastSeenAt:         timestampToPtr(rt.LastSeenAt),
 		CreatedAt:          timestampToString(rt.CreatedAt),
 		UpdatedAt:          timestampToString(rt.UpdatedAt),

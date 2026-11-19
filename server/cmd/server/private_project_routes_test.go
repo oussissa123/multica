@@ -106,7 +106,6 @@ var routeParamsOutsideProjects = map[string]outsideProjectParam{
 	"issue-statuses/{id}":            {why: "a workspace issue status"},
 	"issue-workflows/{id}":           {why: "a workspace workflow; the projects using it are filtered out of its payload"},
 	"handoffs/{status}":              {why: "a workflow handoff status key"},
-	"project-folders/{id}":           {why: "a workspace folder of projects"},
 	"docs/{id}":                      {why: "a workspace doc"},
 	"doc-folders/{id}":               {why: "a workspace folder of docs"},
 	"versions/{number}":              {why: "a version of a workspace doc; the run that wrote it is recorded by id only"},

@@ -263,9 +263,15 @@ func TestTaskFailureClassifiers(t *testing.T) {
 		// Transient mid-stream provider disconnect (MUL-4910): retryable, and
 		// resume-safe so the retry continues the truncated conversation.
 		{reason: "agent_error.provider_network", wantType: "agent_error", wantResumeOK: true, wantRetry: true},
-		// Capacity/rate-limit failures keep their existing user-retry posture.
-		// Correcting a misleading auth label must not enable an automatic resend.
-		{reason: "agent_error.provider_capacity_or_rate_limit", wantType: "agent_error", wantResumeOK: true, wantRetry: false},
+		// Capacity/rate-limit failures are retried after a backoff that honours
+		// the provider's retry-after (task_recovery.go).
+		{reason: "agent_error.provider_capacity_or_rate_limit", wantType: "agent_error", wantResumeOK: true, wantRetry: true},
+		{reason: "agent_error.provider_usage_window", wantType: "agent_error", wantResumeOK: true, wantRetry: true},
+		// A prepaid balance does not come back on its own, so the run is
+		// rechecked on a long backoff until a person tops it up.
+		{reason: "agent_error.provider_quota_limit", wantType: "agent_error", wantResumeOK: true, wantRetry: true},
+		{reason: "agent_error.provider_auth_or_access", wantType: "agent_error", wantResumeOK: true, wantRetry: true},
+		{reason: "agent_error.model_not_found_or_unavailable", wantType: "agent_error", wantResumeOK: true, wantRetry: false},
 		{reason: "runtime_recovery", wantType: "runtime", wantResumeOK: true, wantRetry: true},
 		{reason: "iteration_limit", wantType: "agent_output", wantResumeOK: false, wantRetry: false},
 		{reason: "api_invalid_request", wantType: "agent_error", wantResumeOK: false, wantRetry: false},
@@ -284,8 +290,8 @@ func TestTaskFailureClassifiers(t *testing.T) {
 			if got := !resumeUnsafeFailureReason(tc.reason); got != tc.wantResumeOK {
 				t.Fatalf("resume-safe(%q) = %v, want %v", tc.reason, got, tc.wantResumeOK)
 			}
-			if got := retryableReasons[tc.reason]; got != tc.wantRetry {
-				t.Fatalf("retryableReasons[%q] = %v, want %v", tc.reason, got, tc.wantRetry)
+			if got := isRetryableReason(tc.reason); got != tc.wantRetry {
+				t.Fatalf("isRetryableReason(%q) = %v, want %v", tc.reason, got, tc.wantRetry)
 			}
 		})
 	}

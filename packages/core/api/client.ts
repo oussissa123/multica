@@ -4652,6 +4652,31 @@ export class ApiClient {
   // defers the empty-transcript judgment — and therefore only withholds the
   // synchronous restore from the response — for clients that send this; without
   // it we would be treated as a pre-#5219 client and get the legacy behaviour.
+  /**
+   * Moves a waiting automatic retry. Without `fireAt` it runs as soon as its
+   * runtime can take it.
+   */
+  async resumeTask(taskId: string, fireAt?: string): Promise<AgentTask> {
+    const raw = await this.fetch<unknown>(`/api/tasks/${taskId}/resume`, {
+      method: "POST",
+      body: JSON.stringify(fireAt ? { fire_at: fireAt } : {}),
+    });
+    const task = parseWithFallback<AgentTask | null>(raw, AgentTaskSchema, null, {
+      endpoint: "POST /api/tasks/:taskId/resume",
+    });
+    if (!task) throw new Error("Invalid task resume response");
+    return task;
+  }
+
+  async liftRuntimeThrottle(runtimeId: string): Promise<AgentRuntime> {
+    const raw = await this.fetch<unknown>(`/api/runtimes/${runtimeId}/throttle/lift`, {
+      method: "POST",
+    });
+    return parseWithFallback(raw, AgentRuntimeSchema, EMPTY_RUNTIME, {
+      endpoint: "POST /api/runtimes/:runtimeId/throttle/lift",
+    });
+  }
+
   async cancelTaskById(
     taskId: string,
     options?: { queuedAction?: "edit" | "remove"; sessionId?: string },

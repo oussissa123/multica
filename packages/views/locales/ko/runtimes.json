@@ -679,6 +679,12 @@
       "connected": "{{name}}이(가) Multica에 연결됨"
     }
   },
+  "throttle": {
+    "title": "{{time}}까지 일시 중지됨",
+    "description": "계정 사용 한도를 모두 사용했습니다. 대기 중인 실행은 실패하지 않고 초기화를 기다립니다.",
+    "lift": "지금 재개",
+    "lift_failed": "런타임을 재개하지 못했습니다"
+  },
   "rate_limits": {
     "title": "한도",
     "caption": "작업 실행 중 CLI가 보고",

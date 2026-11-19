@@ -86,7 +86,9 @@ Le journal d'exécution totalise aussi le **Dépensé**, les **Tokens** et le **
 
 Les défaillances transitoires — un runtime brièvement hors ligne, un redémarrage du daemon, un délai d'exécution dépassé ou une interruption réseau dans l'outil de codage IA — peuvent déclencher une relance automatique. Par défaut, une exécution ordinaire est tentée au plus deux fois ; les interruptions réseau de l'outil ont droit à trois tentatives au maximum.
 
-Les erreurs renvoyées par l'agent lui-même ne sont généralement pas relancées automatiquement. Identifiants expirés, quota épuisé, mauvaise configuration ou modèle incapable de traiter la requête : il faut d'abord corriger la cause, puis relancer manuellement.
+Les erreurs renvoyées par l'agent lui-même ne sont généralement pas relancées automatiquement. Quand une personne doit corriger la cause sur la machine ou le compte du runtime (identifiants expirés, solde épuisé, clé manquante, CLI absent ou trop ancien), l'exécution est revérifiée avec une attente croissante et repart aussitôt qu'une autre exécution réussit sur le même runtime ; corrigez la cause, puis utilisez « Lancer maintenant » sur la relance en attente si vous ne voulez pas attendre. Un modèle incapable de traiter la requête demande de corriger la cause, puis de relancer manuellement.
+
+Les limites du fournisseur font exception : une limite de débit, une erreur serveur du fournisseur ou une fenêtre d'usage de l'abonnement épuisée (comme la limite de session ou hebdomadaire de Claude Code) sont relancées automatiquement dès que le fournisseur accepte de nouveau les requêtes. Pour une fenêtre épuisée, l'exécution attend l'heure de réinitialisation indiquée par l'outil, et son runtime ne prend aucune nouvelle exécution d'ici là : le reste de sa file attend au lieu d'échouer sur la même limite. La page du runtime affiche la pause, et son propriétaire ou un administrateur de l'espace de travail peut la lever plus tôt, par exemple après avoir changé de compte dans l'outil. Une relance en attente apparaît dans l'historique d'exécution du ticket avec son heure prévue ; vous pouvez la lancer tout de suite ou l'annuler depuis cet endroit.
 
 Le mode **Exécution seule** d'une automatisation ne relance pas automatiquement, pour éviter tout chevauchement avec la prochaine exécution planifiée. Le mode **Créer une tâche** produit des exécutions de tâche ordinaires, donc les défaillances d'infrastructure sont toujours relancées selon les règles ci-dessus. Les deux modes affichent leur résultat final dans l'historique des exécutions de l'automatisation.
 
@@ -120,9 +122,10 @@ Le préfixe `agent_error.` est omis dans ce tableau.
 | Motif | Signification | Que faire |
 | --- | --- | --- |
 | `provider_auth_or_access` | Échec d'authentification ou accès refusé par le fournisseur du modèle (401/403) | Reconnectez-vous dans cet outil de codage IA, ou vérifiez la clé API |
-| `provider_quota_limit` | Quota ou solde épuisé | Rechargez le compte ou changez de compte |
-| `provider_capacity_or_rate_limit` | Limite de débit atteinte ou capacité insuffisante | Réessayez plus tard |
-| `provider_server_error` | Erreur serveur du fournisseur du modèle (5xx) | Réessayez plus tard |
+| `provider_quota_limit` | Quota ou solde épuisé (402) | Rechargez le compte ou changez de compte |
+| `provider_usage_window` | Fenêtre d'usage de l'abonnement épuisée (limite de session ou hebdomadaire) | Relance automatique après la réinitialisation de la fenêtre ; le runtime ne prend aucune nouvelle exécution d'ici là |
+| `provider_capacity_or_rate_limit` | Limite de débit atteinte ou capacité insuffisante (429/529) | Relance automatique après un délai d'attente |
+| `provider_server_error` | Erreur serveur du fournisseur du modèle (5xx) | Relance automatique après un court délai |
 | `provider_network` | Échec réseau lors de la connexion au fournisseur du modèle | Relance automatique ; vérifiez le réseau de la machine d'exécution si le problème persiste |
 | `model_not_found_or_unavailable` | Le modèle n'existe pas ou est actuellement indisponible | Choisissez un modèle disponible dans les paramètres de l'agent |
 | `context_overflow` | Le contexte a dépassé la fenêtre du modèle | Réduisez le périmètre de la tâche ou le volume d'entrée |
@@ -180,8 +183,14 @@ La relance automatique ne couvre que les défaillances transitoires ci-dessous, 
 | Codex bloqué sans sortie utile | 2 par défaut |
 | Échec du téléchargement du bundle de skills | 2 par défaut (le processus de l'agent n'a pas encore démarré à ce stade ; les bundles déjà téléchargés proviennent du cache local) |
 | Interruption réseau de l'outil | Jusqu'à 3 ; la dernière tentative démarre après un délai d'environ 5 secondes |
+| Limite de débit du fournisseur (429/529) | Jusqu'à 6 ; chaque relance attend 1, 5, 15, 30 puis 60 minutes, ou plus si le fournisseur le demande |
+| Erreur serveur du fournisseur (5xx) | Jusqu'à 3 ; les relances attendent environ 30 secondes, puis 2 minutes |
+| Fenêtre d'usage de l'abonnement épuisée | Jusqu'à 4 ; chaque relance démarre quelques minutes après la réinitialisation indiquée par l'outil (1 heure s'il n'en indique aucune) ; une réinitialisation à plus de 7 jours n'est pas relancée |
+| Connexion, configuration, CLI ou crédit à corriger | Jusqu'à 4 revérifications, après environ 30 minutes, 2 heures, 8 heures et 24 heures ; repart aussitôt qu'une autre exécution réussit sur le même runtime |
 
-Tous les autres motifs d'échec (authentification, quota, configuration, modèle, etc.) ne sont jamais relancés automatiquement ; corrigez d'abord la cause, puis relancez manuellement.
+Les lignes des limites du fournisseur et des revérifications sont des valeurs par défaut. Les propriétaires et administrateurs de l'espace de travail peuvent changer chaque nombre de relances (0 à 10), l'attente maximale, la mise en pause du runtime, ou désactiver ces relances, dans **Paramètres → Général → Relances automatiques**.
+
+Les autres raisons d'échec (modèle, contexte, processus, etc.) ne sont jamais relancées automatiquement : corrigez d'abord la cause, puis relancez manuellement.
 
 ## Étapes suivantes
 
