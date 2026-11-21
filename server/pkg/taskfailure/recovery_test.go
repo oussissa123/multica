@@ -35,6 +35,10 @@ func TestClassifyUsageWindowVersusBilling(t *testing.T) {
 		"Claude AI usage limit reached|1795021200":                                        ReasonAgentProviderUsageWindow,
 		"You've hit your usage limit. Upgrade to Pro or try again in 2 hours 13 minutes.": ReasonAgentProviderUsageWindow,
 		"API Error: 403 usage limit exceeded, resets at 10:00":                            ReasonAgentProviderUsageWindow,
+		"You've hit your 5-hour limit · resets 4:50pm (UTC)":                              ReasonAgentProviderUsageWindow,
+		"You've hit your daily limit":                                                     ReasonAgentProviderUsageWindow,
+		"You've hit your Opus limit · resets 9pm (Europe/Paris)":                          ReasonAgentProviderUsageWindow,
+		"You've hit your monthly limit · resets Dec 1":                                    ReasonAgentProviderQuotaLimit,
 		// No reset named: nothing says the account recovers on its own.
 		"API Error: 403 usage limit exceeded":                      ReasonAgentProviderQuotaLimit,
 		"You've hit your limit":                                    ReasonAgentProviderQuotaLimit,
@@ -60,6 +64,8 @@ func TestNormalizeDaemonReasonUpgradesUsageWindow(t *testing.T) {
 		{"agent_error.provider_quota_limit", "You've hit your session limit · resets 2pm (UTC)", ReasonAgentProviderUsageWindow},
 		{"agent_error.provider_quota_limit", "You've hit your usage limit. Try again in 2 hours 13 minutes.", ReasonAgentProviderUsageWindow},
 		{"agent_error.provider_auth_or_access", "API Error: 403 usage limit exceeded, resets at 10:00", ReasonAgentProviderUsageWindow},
+		// The daemon's own classifier missed this wording and reported unknown.
+		{"agent_error.unknown", "You've hit your 5-hour limit · resets 4:50pm (UTC)", ReasonAgentProviderUsageWindow},
 		// Billing keeps its reason: nothing says the account recovers.
 		{"agent_error.provider_quota_limit", "API Error: 402 insufficient_balance", ReasonAgentProviderQuotaLimit},
 		{"agent_error.provider_quota_limit", "You've hit your limit", ReasonAgentProviderQuotaLimit},
