@@ -49,6 +49,8 @@ var recoveryClassByReason = map[Reason]RecoveryClass{
 	ReasonInvalidTaskIdentity:      RecoveryPermanent,
 	ReasonRuntimeAccessDenied:      RecoveryHumanAction,
 	ReasonRuntimeAccessRevoked:     RecoveryHumanAction,
+	// The project's linked folder is gone; someone has to restore or relink it.
+	ReasonLocalDirectoryMissing: RecoveryHumanAction,
 
 	ReasonAgentProviderAuthOrAccess:        RecoveryHumanAction,
 	ReasonAgentProviderQuotaLimit:          RecoveryHumanAction,

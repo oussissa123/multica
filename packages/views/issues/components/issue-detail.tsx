@@ -48,6 +48,7 @@ import { IconButton } from "@multica/ui/components/common/icon-button";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@multica/ui/components/ui/resizable";
 import { Sheet, SheetContent } from "@multica/ui/components/ui/sheet";
 import { useIsMobile } from "@multica/ui/hooks/use-mobile";
+import { StorageLimitNotice } from "../../billing/storage-limit-notice";
 import { ContentEditor, ReadonlyContent, type ContentEditorRef, TitleEditor, type TitleEditorRef, useFileDropZone, FileDropOverlay, useLazyEditor, useEditorUpload, PreviewSequenceProvider, collectPreviewSequence } from "../../editor";
 import {
   WAKEUP_ACTIVITY_ACTIONS,
@@ -460,10 +461,18 @@ function formatActivity(
       return t(($) => $.activity.duplicate_removed, {
         identifier: details.duplicate_identifier || "?",
       });
-    case "task_completed":
-      return t(($) => $.activity.task_completed, { count: entry.coalesced_count ?? 1 });
-    case "task_failed":
-      return t(($) => $.activity.task_failed, { count: entry.coalesced_count ?? 1 });
+    case "task_completed": {
+      const count = entry.coalesced_count ?? 1;
+      return count === 1
+        ? t(($) => $.activity.task_completed_single)
+        : t(($) => $.activity.task_completed, { count });
+    }
+    case "task_failed": {
+      const count = entry.coalesced_count ?? 1;
+      return count === 1
+        ? t(($) => $.activity.task_failed_single)
+        : t(($) => $.activity.task_failed, { count });
+    }
     case "squad_leader_evaluated": {
       const reason = details.reason?.trim();
       switch (details.outcome) {
@@ -1558,7 +1567,11 @@ export function IssueDetail({ issueId, onDelete, onDone, onUnsubscribeArchive, d
   // editor already strips `blob:` before serializing and binds ids on the
   // later save). It still needs the failure toast, or a failed upload just
   // erases its own placeholder and the file disappears unexplained.
-  const { uploadWithToast } = useEditorUpload();
+  const {
+    uploadWithToast,
+    storageRefusal: descStorageRefusal,
+    dismissStorageRefusal: dismissDescStorageRefusal,
+  } = useEditorUpload({ inlineStorageNotice: true });
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: layoutId,
   });
@@ -4194,6 +4207,13 @@ export function IssueDetail({ issueId, onDelete, onDone, onUnsubscribeArchive, d
               />
               )}
             </div>
+            {descStorageRefusal && (
+              <StorageLimitNotice
+                refusal={descStorageRefusal}
+                onDismiss={dismissDescStorageRefusal}
+                className="mt-2"
+              />
+            )}
 
             <div className="flex items-center gap-1 mt-3">
               <ReactionBar
