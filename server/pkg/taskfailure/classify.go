@@ -79,17 +79,27 @@ var (
 		"you\u2019ve hit your limit",
 	}
 	usageResetMarkers = []string{"resets", "reset at", "try again in", "try again at"}
+
+	// namedWindowRe matches Claude Code naming the window it used up: "You've
+	// hit your 5-hour limit · resets 4:50pm (UTC)", "hit your daily limit".
+	// Listing each wording missed the 5-hour one, which then fell to
+	// agent_error.unknown and was never retried.
+	namedWindowRe = regexp.MustCompile(`hit your (?:session|weekly|daily|\d+[- ]?hours?) limit`)
+	// anyNamedLimitRe covers windows named otherwise ("hit your Opus limit");
+	// only a reset marker tells them apart from a billing limit.
+	anyNamedLimitRe = regexp.MustCompile(`hit your [a-z0-9][a-z0-9 -]{0,23} limit`)
 )
 
 func isUsageWindowExhausted(lower string) bool {
 	if httpQuotaCodeRe.MatchString(lower) ||
-		containsAny(lower, "insufficient_balance", "balance is too low", "monthly usage limit") {
+		containsAny(lower, "insufficient_balance", "balance is too low", "monthly usage limit", "monthly limit") {
 		return false
 	}
-	if containsAny(lower, usageWindowWitnesses...) {
+	if containsAny(lower, usageWindowWitnesses...) || namedWindowRe.MatchString(lower) {
 		return true
 	}
-	return containsAny(lower, usageLimitPhrases...) && containsAny(lower, usageResetMarkers...)
+	return (containsAny(lower, usageLimitPhrases...) || anyNamedLimitRe.MatchString(lower)) &&
+		containsAny(lower, usageResetMarkers...)
 }
 
 // tokenRateLimitRe matches the per-minute quota labels a gateway prints on a
@@ -257,6 +267,7 @@ func Classify(rawError string) Reason {
 			"insufficient balance",
 			"balance is too low",
 			"monthly usage limit",
+			"monthly limit",
 			"usage limit",
 			"you've hit your limit",
 			// Curly apostrophe variant: providers and copy-pasted error
