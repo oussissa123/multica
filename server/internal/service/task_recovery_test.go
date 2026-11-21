@@ -10,6 +10,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/testutil"
 	"github.com/multica-ai/multica/server/internal/util"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
+	"github.com/multica-ai/multica/server/pkg/taskfailure"
 )
 
 func TestExhaustedWindowReset(t *testing.T) {
@@ -56,6 +57,43 @@ func TestUsageWindowResetSources(t *testing.T) {
 	reset, source = usageWindowReset("You've hit your session limit", nil, now)
 	if source != "default" || !reset.Equal(now.Add(usageWindowDefaultWait)) {
 		t.Fatalf("default last: got (%s, %s)", reset, source)
+	}
+}
+
+// A used-up Claude window, as an installed daemon reports it (agent_error.unknown
+// from its older classifier), resumes at the reset the message names, and the
+// runtime is held until then so the rest of its queue waits instead of failing.
+func TestPlanRetryUsageWindowAtNamedReset(t *testing.T) {
+	now := time.Date(2026, time.November, 21, 14, 41, 0, 0, time.UTC)
+	cases := []struct {
+		name  string
+		text  string
+		reset time.Time
+	}{
+		{"5-hour limit today", "You've hit your 5-hour limit · resets 4:50pm (UTC)", time.Date(2026, time.November, 21, 16, 50, 0, 0, time.UTC)},
+		{"weekly limit on a named day", "You’ve hit your weekly limit · resets Nov 26, 4:50pm (UTC)", time.Date(2026, time.November, 26, 16, 50, 0, 0, time.UTC)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reason := taskfailure.NormalizeDaemonReason(string(taskfailure.ReasonAgentUnknown), tc.text).String()
+			if reason != string(taskfailure.ReasonAgentProviderUsageWindow) {
+				t.Fatalf("reason = %q, want %q", reason, taskfailure.ReasonAgentProviderUsageWindow)
+			}
+			plan, ok := (&TaskService{}).planRetry(context.Background(), db.AgentTaskQueue{Attempt: 1}, reason, tc.text, now, DefaultRecoveryPolicy())
+			if !ok {
+				t.Fatal("usage window not retried")
+			}
+			wantThrottle := tc.reset.Add(usageWindowResetMargin)
+			if !plan.throttleUntil.Equal(wantThrottle) {
+				t.Fatalf("runtime held until %s, want %s", plan.throttleUntil, wantThrottle)
+			}
+			if plan.fireAt.Before(wantThrottle) || !plan.fireAt.Before(wantThrottle.Add(usageWindowResumeJitter)) {
+				t.Fatalf("retry fires at %s, want within %s after %s", plan.fireAt, usageWindowResumeJitter, wantThrottle)
+			}
+			if plan.hintSource != "error_text" || plan.maxAttempts != usageWindowMaxAttempts {
+				t.Fatalf("plan = %+v, want the reset read from the error text and %d attempts", plan, usageWindowMaxAttempts)
+			}
+		})
 	}
 }
 
