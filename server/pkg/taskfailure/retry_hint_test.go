@@ -47,6 +47,16 @@ func TestParseRetryHint(t *testing.T) {
 			want: time.Date(2026, time.November, 21, 9, 0, 0, 0, time.UTC),
 		},
 		{
+			name: "claude 5-hour limit, minutes glued to pm",
+			text: "You've hit your 5-hour limit · resets 4:50pm (UTC)",
+			want: time.Date(2026, time.November, 18, 16, 50, 0, 0, time.UTC),
+		},
+		{
+			name: "claude weekly limit, date and minutes glued to pm",
+			text: "You’ve hit your weekly limit · resets Nov 24, 4:50pm (UTC)",
+			want: time.Date(2026, time.November, 24, 16, 50, 0, 0, time.UTC),
+		},
+		{
 			name: "24h clock",
 			text: "usage limit reached, try again at 15:30",
 			want: time.Date(2026, time.November, 18, 15, 30, 0, 0, time.UTC),
@@ -100,8 +110,9 @@ func TestParseRetryHintRejects(t *testing.T) {
 		"insufficient_balance: please top up",
 		"the counter resets 5 times per run",
 		"resets 25:00",
-		"Claude AI usage limit reached|1000000000", // in the past
-		"try again in 30 days",                     // beyond any provider window
+		"Claude AI usage limit reached|1000000000",                   // in the past
+		"try again in 30 days",                                       // beyond any provider window
+		"You’ve hit your weekly limit · resets Nov 27, 4:50pm (UTC)", // past the longest window
 		"API Error: 500 Internal Server Error",
 		strings.Repeat("x", retryHintMaxInput) + " try again in 5 minutes",
 	} {
